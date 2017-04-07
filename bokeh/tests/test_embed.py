@@ -86,9 +86,14 @@ class TestComponents(unittest.TestCase):
         self.assertEqual(len(divs), 2)
 
         div = divs[0]
-        self.assertTrue(set(div.attrs), set(['class', 'id']))
+        self.assertEqual(set(div.attrs), set(['class']))
         self.assertEqual(div.attrs['class'], ['bk-root'])
         self.assertEqual(div.text, '\n\n')
+
+        div = divs[1]
+        self.assertEqual(set(div.attrs), set(['id', 'class']))
+        self.assertEqual(div.attrs['class'], ['bk-plotdiv'])
+        self.assertEqual(div.text, '')
 
     def test_script_is_utf8_encoded(self):
         script, div = embed.components(_embed_test_plot)
@@ -126,17 +131,14 @@ class TestNotebookDiv(unittest.TestCase):
         self.assertEqual(len(divs), 2)
 
         div = divs[0]
-        self.assertTrue(set(div.attrs), set(['class', 'id']))
+        self.assertEqual(set(div.attrs), set(['class']))
         self.assertEqual(div.attrs['class'], ['bk-root'])
         self.assertEqual(div.text, '\n\n')
 
-    def test_model_in_empty_document_context_manager_is_used(self):
-        m = mock.MagicMock(name='_ModelInEmptyDocument')
-        plot1 = figure()
-        curdoc().add_root(plot1)
-        with mock.patch('bokeh.embed._ModelInEmptyDocument', m):
-            embed.notebook_div(plot1)
-        m.assert_called_once_with(plot1)
+        div = divs[1]
+        self.assertEqual(set(div.attrs), set(['id', 'class']))
+        self.assertEqual(div.attrs['class'], ['bk-plotdiv'])
+        self.assertEqual(div.text, '')
 
 
 class TestFileHTML(unittest.TestCase):
@@ -252,8 +254,8 @@ class TestAutoloadServer(unittest.TestCase):
             'id'
         ]))
         divid = attrs['id']
-        src = "%s/autoload.js?bokeh-autoload-element=%s&bokeh-session-id=fakesession" % \
-              ("http://localhost:5006", divid)
+        src = "%s/autoload.js?bokeh-autoload-element=%s&bokeh-absolute-url=%s&bokeh-session-id=fakesession" % \
+              ("http://localhost:5006", divid, "http://localhost:5006")
         self.assertDictEqual({ 'data-bokeh-doc-id' : '',
                                'data-bokeh-model-id' : str(_embed_test_plot._id),
                                'id' : divid,
@@ -274,13 +276,78 @@ class TestAutoloadServer(unittest.TestCase):
             'id'
         ]))
         divid = attrs['id']
-        src = "%s/autoload.js?bokeh-autoload-element=%s" % \
-              ("http://localhost:5006", divid)
+        src = "%s/autoload.js?bokeh-autoload-element=%s&bokeh-absolute-url=%s" % \
+              ("http://localhost:5006", divid, "http://localhost:5006")
         self.assertDictEqual({ 'data-bokeh-doc-id' : '',
                                'data-bokeh-model-id' : '',
                                'id' : divid,
                                'src' : src },
                              attrs)
 
-    def test_autoload_server_value_error_on_model_id_without_session_id(self):
-        self.assertRaises(ValueError, embed.autoload_server, _embed_test_plot)
+    def test_script_attrs_url_provided(self):
+        r = embed.autoload_server(url="http://localhost:8081/foo/bar/sliders", relative_urls=True)
+        self.assertTrue('bokeh-app-path=/foo/bar/sliders' in r)
+        html = bs4.BeautifulSoup(r)
+        scripts = html.findAll(name='script')
+        self.assertEqual(len(scripts), 1)
+        attrs = scripts[0].attrs
+        self.assertTrue(set(attrs), set([
+            'src',
+            'data-bokeh-doc-id',
+            'data-bokeh-model-id',
+            'id'
+        ]))
+        divid = attrs['id']
+        src = "%s/autoload.js?bokeh-autoload-element=%s&bokeh-app-path=/foo/bar/sliders" % \
+              ("http://localhost:8081/foo/bar/sliders", divid)
+        self.assertDictEqual({ 'data-bokeh-doc-id' : '',
+                               'data-bokeh-model-id' : '',
+                               'id' : divid,
+                               'src' : src },
+                             attrs)
+
+    def test_script_attrs_url_provided_absolute_resources(self):
+        r = embed.autoload_server(url="http://localhost:8081/foo/bar/sliders")
+        self.assertTrue('bokeh-app-path=/foo/bar/sliders' in r)
+        self.assertTrue('bokeh-absolute-url=http://localhost:8081/foo/bar/sliders' in r)
+        html = bs4.BeautifulSoup(r)
+        scripts = html.findAll(name='script')
+        self.assertEqual(len(scripts), 1)
+        attrs = scripts[0].attrs
+        self.assertTrue(set(attrs), set([
+            'src',
+            'data-bokeh-doc-id',
+            'data-bokeh-model-id',
+            'id'
+        ]))
+        divid = attrs['id']
+        src = "%s/autoload.js?bokeh-autoload-element=%s&bokeh-app-path=/foo/bar/sliders&bokeh-absolute-url=%s" % \
+              ("http://localhost:8081/foo/bar/sliders", divid, "http://localhost:8081/foo/bar/sliders")
+        self.assertDictEqual({ 'data-bokeh-doc-id' : '',
+                               'data-bokeh-model-id' : '',
+                               'id' : divid,
+                               'src' : src },
+                             attrs)
+
+    def test_script_attrs_url_and_app_path_provided(self):
+        for path in ("/foo/bar/sliders", "/foo/bar/sliders/", "foo/bar/sliders", "foo/bar/sliders"):
+            r = embed.autoload_server(url="http://localhost:8081", app_path=path, relative_urls=True)
+            self.assertTrue('bokeh-app-path=/foo/bar/sliders' in r)
+            html = bs4.BeautifulSoup(r)
+            scripts = html.findAll(name='script')
+            self.assertEqual(len(scripts), 1)
+            attrs = scripts[0].attrs
+            self.assertTrue(set(attrs), set([
+                'src',
+                'data-bokeh-doc-id',
+                'data-bokeh-model-id',
+                'id'
+            ]))
+            divid = attrs['id']
+            src = "%s/autoload.js?bokeh-autoload-element=%s&bokeh-app-path=/foo/bar/sliders" % \
+                  ("http://localhost:8081/foo/bar/sliders", divid)
+            self.assertDictEqual({ 'data-bokeh-doc-id' : '',
+                                   'data-bokeh-model-id' : '',
+                                   'id' : divid,
+                                   'src' : src },
+                                 attrs)

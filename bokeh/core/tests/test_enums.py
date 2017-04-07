@@ -51,6 +51,8 @@ def test_enums_contents():
         'FontStyle',
         'HorizontalLocation',
         'JitterRandomDistribution',
+        'LatLon',
+        'LegendClickPolicy',
         'LegendLocation',
         'LineCap',
         'LineDash',

@@ -2,6 +2,7 @@
 
 '''
 from __future__ import absolute_import
+from bokeh.core.templates import NOTEBOOK_CELL_OBSERVER
 
 _notebook_loaded = None
 
@@ -44,6 +45,7 @@ def _load_notebook_html(resources=None, verbose=False, hide_banner=False,
     from .. import __version__
     from ..core.templates import AUTOLOAD_NB_JS, NOTEBOOK_LOAD
     from ..util.serialization import make_id
+    from ..util.compiler import bundle_all_models
     from ..resources import CDN
 
     if resources is None:
@@ -75,11 +77,13 @@ def _load_notebook_html(resources=None, verbose=False, hide_banner=False,
         hide_banner   = hide_banner,
     )
 
+    custom_models_js = bundle_all_models()
+
     js = AUTOLOAD_NB_JS.render(
         elementid = '' if hide_banner else element_id,
         js_urls  = resources.js_files,
         css_urls = resources.css_files,
-        js_raw   = resources.js_raw + ([] if hide_banner else [FINALIZE_JS % element_id]),
+        js_raw   = resources.js_raw + [custom_models_js] + ([] if hide_banner else [FINALIZE_JS % element_id]),
         css_raw  = resources.css_raw_str,
         force    = True,
         timeout  = load_timeout
@@ -118,3 +122,16 @@ def get_comms(target_name):
     '''
     from ipykernel.comm import Comm
     return Comm(target_name=target_name, data={})
+
+
+def watch_server_cells(inner_block):
+    ''' Installs a MutationObserver that detects deletion of cells using
+    io.server_cell to wrap the output.
+
+    The inner_block is a Javascript block that is executed when a server
+    cell is removed from the DOM. The id of the destroyed div is in
+    scope as the variable destroyed_id.
+    '''
+    js = NOTEBOOK_CELL_OBSERVER.render(inner_block=inner_block)
+    script = "<script type='text/javascript'>{js}</script>".format(js=js)
+    publish_display_data({'text/html': script}, source='bokeh')

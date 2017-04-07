@@ -1,7 +1,7 @@
 import {SingleIntervalTicker} from "./single_interval_ticker"
 import * as util from "./util"
-import * as p from "../../core/properties"
-import {concat} from "../../core/util/array"
+import * as p from "core/properties"
+import {concat} from "core/util/array"
 
 copy_date = util.copy_date
 last_month_no_later_than = util.last_month_no_later_than
@@ -50,7 +50,7 @@ export class DaysTicker extends SingleIntervalTicker
         31 * ONE_DAY
     @interval = interval
 
-  get_ticks_no_defaults: (data_low, data_high, desired_n_ticks) ->
+  get_ticks_no_defaults: (data_low, data_high, cross_loc, desired_n_ticks) ->
     month_dates = date_range_by_month(data_low, data_high)
 
     days = @days

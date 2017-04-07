@@ -3,17 +3,17 @@
 '''
 from __future__ import absolute_import
 
-from ..core.has_props import abstract, HasProps
-from ..core.properties import Enum, Float, Instance, Int, JSON, Override, String
 from ..core.enums import MapType
+from ..core.has_props import abstract
+from ..core.properties import Bool, Enum, Float, Instance, Int, JSON, Override, String
 from ..core.validation import error, warning
 from ..core.validation.warnings import MISSING_RENDERERS, NO_DATA_RENDERERS
 from ..core.validation.errors import REQUIRED_RANGE, MISSING_GOOGLE_API_KEY
-
+from ..model import Model
 from .plots import Plot
 
 @abstract
-class MapOptions(HasProps):
+class MapOptions(Model):
     ''' Abstract base class for map options' models.
 
     '''
@@ -41,11 +41,15 @@ class GMapOptions(MapOptions):
 
     '''
 
-    map_type = Enum(MapType, help="""
+    map_type = Enum(MapType, default="roadmap", help="""
     The `map type`_ to use for the GMapPlot.
 
     .. _map type: https://developers.google.com/maps/documentation/javascript/reference#MapTypeId
 
+    """)
+
+    scale_control = Bool(default=False, help="""
+    Whether the Google map should display its distance scale control.
     """)
 
     styles = JSON(help="""

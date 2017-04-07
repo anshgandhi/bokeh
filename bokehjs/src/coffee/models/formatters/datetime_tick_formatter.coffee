@@ -2,10 +2,10 @@ import * as SPrintf from "sprintf"
 import * as tz from "timezone"
 
 import {TickFormatter} from "./tick_formatter"
-import {logger} from "../../core/logging"
-import * as p from "../../core/properties"
-import {zip, unzip, sortBy} from "../../core/util/array"
-import {isFunction} from "../../core/util/types"
+import {logger} from "core/logging"
+import * as p from "core/properties"
+import {zip, unzip, sortBy} from "core/util/array"
+import {isFunction} from "core/util/types"
 
 _us = (t) ->
   # From double-precision unix (millisecond) timestamp get
@@ -108,7 +108,8 @@ export class DatetimeTickFormatter extends TickFormatter
       when adjusted_secs < 365*24*3600 then "months"
       else                                  "years"
 
-  doFormat: (ticks, num_labels=null, char_width=null, fill_ratio=0.3, ticker=null) ->
+  # TODO (bev) remove these unused "default" params and associated logic
+  doFormat: (ticks, loc, num_labels=null, char_width=null, fill_ratio=0.3, ticker=null) ->
 
     # In order to pick the right set of labels, we need to determine
     # the resolution of the ticks.  We can do this using a ticker if

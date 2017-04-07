@@ -6,10 +6,10 @@ import {LinearMapper} from "../mappers/linear_mapper"
 import {LogMapper} from "../mappers/log_mapper"
 import {Range1d} from "../ranges/range1d"
 
-import * as p from "../../core/properties"
-import * as text_util from "../../core/util/text"
-import {min, max} from "../../core/util/array"
-import {isString, isArray} from "../../core/util/types"
+import * as p from "core/properties"
+import * as text_util from "core/util/text"
+import {min, max} from "core/util/array"
+import {isString, isArray} from "core/util/types"
 
 SHORT_DIM = 25
 LONG_DIM_MIN_SCALAR = 0.3
@@ -135,7 +135,7 @@ export class ColorBarView extends AnnotationView
     return {sx: sx, sy: sy}
 
   render: () ->
-    if @model.visible == false
+    if not @model.visible
       return
 
     ctx = @plot_view.canvas_view.ctx
@@ -244,7 +244,10 @@ export class ColorBarView extends AnnotationView
     [sx, sy] = @model._tick_coordinates().major
 
     labels = @model._tick_coordinates().major_labels
-    formatted_labels = @model.formatter.doFormat(labels)
+
+    # note: passing null as cross_loc probably means MercatorTickFormatters, etc
+    # will not function properly in conjunction with colorbars
+    formatted_labels = @model.formatter.doFormat(labels, null)
 
     @visuals.major_label_text.set_value(ctx)
 
@@ -470,7 +473,10 @@ export class ColorBar extends Annotation
     [i, j] = @_normals()
 
     [start, end] = [@color_mapper.low, @color_mapper.high]
-    ticks = @ticker.get_ticks(start, end, null, @ticker.desired_num_ticks)
+
+    # note: passing null as cross_loc probably means MercatorTickers, etc
+    # will not function properly in conjunction with colorbars
+    ticks = @ticker.get_ticks(start, end, null, null, @ticker.desired_num_ticks)
 
     majors = ticks.major
     minors = ticks.minor

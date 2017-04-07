@@ -1,8 +1,8 @@
 import {DataRange} from "./data_range"
 import {GlyphRenderer} from "../renderers/glyph_renderer"
-import {logger} from "../../core/logging"
-import * as p from "../../core/properties"
-import * as bbox from "../../core/util/bbox"
+import {logger} from "core/logging"
+import * as p from "core/properties"
+import * as bbox from "core/util/bbox"
 
 export class DataRange1d extends DataRange
   type: 'DataRange1d'
@@ -180,6 +180,7 @@ export class DataRange1d extends DataRange
 
   reset: () ->
     @have_updated_interactively = false
+    # change events silenced as PlotCanvasView.update_dataranges triggers property callbacks
     @setv({
       range_padding: @_initial_range_padding
       follow: @_initial_follow

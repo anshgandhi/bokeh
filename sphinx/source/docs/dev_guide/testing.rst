@@ -58,6 +58,14 @@ To run any of the tests without standard output captured use:
 
   py.test -s
 
+To run a subset of tests by name:
+
+.. code-block:: sh
+
+  py.test -k EXPRESSION
+
+This will run only the tests that include ``EXPRESSION`` in their names (function or class names).
+
 See the py.test documentation at http://pytest.org/latest/ for further information on py.test and it's options.
 
 Examples tests
@@ -67,15 +75,14 @@ To run just the examples tests, run the command:
 
 .. code-block:: sh
 
-    py.test -m examples --examplereport=examples.html
+    py.test -m examples --report-path=examples.html
 
 The examples tests run through most of the bokeh examples and perform a visual
 diff to check how the examples are running. To run the examples tests you need:
 - phantomjs
-- perceptualdiff
 
-On linux systems, ``conda install phantomjs pdiff``.
-On OSX, with homebrew ``brew install phantomjs perceptualdiff``.
+On linux systems, ``conda install phantomjs``.
+On OSX, with homebrew ``brew install phantomjs``.
 
 After the tests have run, you will be able to see the test report at
 examples.html. On your local machine, you can name the test report wherever you
@@ -85,7 +92,7 @@ The examples tests can run slowly, to speed them up, you can parallelize them:
 
 .. code-block:: sh
 
-    py.test -m examples --examplereport=examples.html -n 5
+    py.test -m examples --report-path=examples.html -n 5
 
 Where the number is the number of cores you want to use.
 
@@ -152,10 +159,17 @@ To run the integration tests on SauceLabs, run the command:
     py.test -m integration --driver=SauceLabs --html=tests/pytest-report.html
 
 For this command to be successful you will need the following:
- - pdiff (see examples tests)
  - ``SAUCELABS_USERNAME`` environment variable
  - ``SAUCELABS_API_KEY`` environment variable
- - sauce connect running (https://wiki.saucelabs.com/display/DOCS/Setting+Up+Sauce+Connect)
+ - Sauce Connect tunnel running
+
+To start up a Sauce Connect tunnel, download Sauce Connect from
+https://wiki.saucelabs.com/display/DOCS/Setting+Up+Sauce+Connect+Proxy. Extract
+the files and go into the install directory. Then you can establish the tunnel with:
+
+.. code-block:: sh
+
+    bin/sc -u SAUCELABS_USERNAME -k SAUCELABS_API_KEY
 
 For the ``SAUCELABS_USERNAME`` and ``SAUCELABS_API_KEY`` talk to the Bokeh Core
 Developers.
@@ -166,9 +180,11 @@ Adding (or updating) a screenshot test
 If you'd like to add a new screenshot test to the Bokeh repo, first make sure
 you can run the existing screenshot tests. Assuming this runs, then you'll be
 able to make a new screenshot test. Check-out the existing screenshot tests to
-see how to set-up your new test.
+see how to set-up your new test. Ideally, tests should contain the minimal amount
+of code to test specific features. This means that you should use the low-level models
+interface rather than the plotting interface (i.e. don't use ``bokeh.plotting.figure``).
 
-Once you have done this you need to generate a base image.
+Once you're set up and have written your test, you need to generate a base image.
 
 To do this add ``--set-new-base-screenshot`` to your test command. This will
 generate an image in a screenshots directory with the name

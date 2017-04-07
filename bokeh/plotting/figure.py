@@ -7,10 +7,7 @@ from six import string_types
 
 from ..core.properties import Auto, Either, Enum, Float, Int, Seq, Instance, String, Tuple
 from ..core.enums import HorizontalLocation, VerticalLocation
-from ..models import Plot
-from ..models.annotations import Title
-from ..models.ranges import Range
-from ..models.tools import Tool
+from ..models import Plot, Range, Title, Tool
 from ..models import glyphs, markers
 from ..util.options import Options
 from ..util._plot_arg_helpers import _convert_responsive
@@ -95,6 +92,21 @@ class Figure(Plot):
 
     def __init__(self, *arg, **kw):
 
+        if 'plot_width' in kw and 'width' in kw:
+            raise ValueError("Figure called with both 'plot_width' and 'width' supplied, supply only one")
+        if 'plot_height' in kw and 'height' in kw:
+            raise ValueError("Figure called with both 'plot_height' and 'height' supplied, supply only one")
+        if 'height' in kw:
+            kw['plot_height'] = kw.pop('height')
+        if 'width' in kw:
+            kw['plot_width'] = kw.pop('width')
+
+        if 'responsive' in kw and 'sizing_mode' in kw:
+            raise ValueError("Figure called with both 'responsive' and 'sizing_mode' supplied, supply only one")
+        if 'responsive' in kw:
+            kw['sizing_mode'] = _convert_responsive(kw['responsive'])
+            del kw['responsive']
+
         opts = FigureOptions(kw)
 
         title = kw.get("title", None)
@@ -123,7 +135,7 @@ Examples:
 
             from bokeh.plotting import figure, output_file, show
 
-            plot = figure(width=300, height=300)
+            plot = figure(plot_width=300, plot_height=300)
             plot.annulus(x=[1, 2, 3], y=[1, 2, 3], color="#7FC97F",
                          inner_radius=0.2, outer_radius=0.5)
 
@@ -141,7 +153,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.asterisk(x=[1,2,3], y=[1,2,3], size=20, color="#F0027F")
 
         show(plot)
@@ -162,7 +174,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.circle(x=[1, 2, 3], y=[1, 2, 3], size=20)
 
         show(plot)
@@ -177,7 +189,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.circle_cross(x=[1,2,3], y=[4,5,6], size=20,
                           color="#FB8072", fill_alpha=0.2, line_width=2)
 
@@ -193,7 +205,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.circle_x(x=[1, 2, 3], y=[1, 2, 3], size=20,
                      color="#DD1C77", fill_alpha=0.2)
 
@@ -209,7 +221,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.cross(x=[1, 2, 3], y=[1, 2, 3], size=20,
                    color="#E6550D", line_width=2)
 
@@ -225,7 +237,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.diamond(x=[1, 2, 3], y=[1, 2, 3], size=20,
                     color="#1C9099", line_width=2)
 
@@ -241,7 +253,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.diamond_cross(x=[1, 2, 3], y=[1, 2, 3], size=20,
                            color="#386CB0", fill_color=None, line_width=2)
 
@@ -257,7 +269,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.hbar(y=[1, 2, 3], height=0.5, left=0, right=[1,2,3], color="#CAB2D6")
 
         show(plot)
@@ -271,7 +283,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.ellipse(x=[1, 2, 3], y=[1, 2, 3], width=30, height=20,
                      color="#386CB0", fill_color=None, line_width=2)
 
@@ -304,7 +316,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.inverted_triangle(x=[1, 2, 3], y=[1, 2, 3], size=20, color="#DE2D26")
 
         show(plot)
@@ -354,7 +366,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.oval(x=[1, 2, 3], y=[1, 2, 3], width=0.2, height=0.4,
                   angle=-0.7, color="#1D91C0")
 
@@ -405,7 +417,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.quad(top=[2, 3, 4], bottom=[1, 2, 3], left=[1, 2, 3],
             right=[1.2, 2.5, 3.7], color="#B3DE69")
 
@@ -423,7 +435,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.ray(x=[1, 2, 3], y=[1, 2, 3], length=45, angle=-0.7, color="#FB8072",
                  line_width=2)
 
@@ -439,7 +451,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.rect(x=[1, 2, 3], y=[1, 2, 3], width=10, height=20, color="#CAB2D6",
             width_units="screen", height_units="screen")
 
@@ -455,7 +467,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.segment(x0=[1, 2, 3], y0=[1, 2, 3], x1=[1, 2, 3],
                     y1=[1.2, 2.5, 3.7], color="#F4A582",
                     line_width=3)
@@ -472,7 +484,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.square(x=[1, 2, 3], y=[1, 2, 3], size=[10,20,30], color="#74ADD1")
 
         show(plot)
@@ -487,7 +499,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.square_cross(x=[1, 2, 3], y=[1, 2, 3], size=[10,20,25],
                          color="#7FC97F",fill_color=None, line_width=2)
 
@@ -503,7 +515,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.square_x(x=[1, 2, 3], y=[1, 2, 3], size=[10,20,25],
                      color="#FDAE6B",fill_color=None, line_width=2)
 
@@ -529,7 +541,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.triangle(x=[1, 2, 3], y=[1, 2, 3], size=[10,20,25],
                      color="#99D594", line_width=2)
 
@@ -545,7 +557,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.vbar(x=[1, 2, 3], width=0.5, bottom=0, top=[1,2,3], color="#CAB2D6")
 
         show(plot)
@@ -560,7 +572,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.wedge(x=[1, 2, 3], y=[1, 2, 3], radius=15, start_angle=0.6,
                      end_angle=4.1, radius_units="screen", color="#2b8cbe")
 
@@ -576,7 +588,7 @@ Examples:
 
         from bokeh.plotting import figure, output_file, show
 
-        plot = figure(width=300, height=300)
+        plot = figure(plot_width=300, plot_height=300)
         plot.x(x=[1, 2, 3], y=[1, 2, 3], size=[10, 20, 25], color="#fa9fb5")
 
         show(plot)
@@ -637,23 +649,7 @@ def figure(**kwargs):
 
     '''
 
-    if 'plot_width' in kwargs and 'width' in kwargs:
-        raise ValueError("figure() called with both 'plot_width' and 'width' supplied, supply only one")
-    if 'plot_height' in kwargs and 'height' in kwargs:
-        raise ValueError("figure() called with both 'plot_height' and 'height' supplied, supply only one")
-    if 'height' in kwargs:
-        kwargs['plot_height'] = kwargs.pop('height')
-    if 'width' in kwargs:
-        kwargs['plot_width'] = kwargs.pop('width')
-
-    if 'responsive' in kwargs and 'sizing_mode' in kwargs:
-        raise ValueError("figure() called with both 'responsive' and 'sizing_mode' supplied, supply only one")
-    if 'responsive' in kwargs:
-        kwargs['sizing_mode'] = _convert_responsive(kwargs['responsive'])
-        del kwargs['responsive']
-
-    fig = Figure(**kwargs)
-    return fig
+    return Figure(**kwargs)
 
 
 _marker_types = [

@@ -21,25 +21,34 @@ class DataSource(Model):
     selected = Dict(String, Dict(String, Any), default={
         '0d': {'glyph': None, 'indices': []},
         '1d': {'indices': []},
-        '2d': {}
+        '2d': {'indices': {}}
     }, help="""
     A dict to indicate selected indices on different dimensions on this DataSource. Keys are:
 
-    - 0d: indicates whether a Line or Patch glyphs have been hit. Value is a
-            dict with the following keys:
+    .. code-block:: python
 
-            - flag (boolean): true if glyph was with false otherwise
-            - indices (list): indices hit (if applicable)
+        # selection information for line and patch glyphs
+        '0d' : {
+          # the glyph that was selected
+          'glyph': None
 
-    - 1d: indicates whether any of all other glyph (except [multi]line or
-            patches) was hit:
+          # array with the [smallest] index of the segment of the line that was hit
+          'indices': []
+        }
 
-            - indices (list): indices that were hit/selected
+        # selection for most (point-like) glyphs, except lines and patches
+        '1d': {
+          # indices of the points included in the selection
+          indices: []
+        }
 
-    - 2d: indicates whether a [multi]line or patches) were hit:
+        # selection information for multiline and patches glyphs
+        '2d': {
+          # mapping of indices of the multiglyph to array of glyph indices that were hit
+          # e.g. {3: [5, 6], 4, [5]}
+          indices: {}
+        }
 
-            - indices (list(list)): indices of the lines/patches that were
-                hit/selected
     """)
 
     callback = Instance(Callback, help="""
@@ -97,8 +106,8 @@ class ColumnDataSource(ColumnarDataSource):
             else:
                 raise ValueError("expected a dict or pandas.DataFrame, got %s" % raw_data)
         super(ColumnDataSource, self).__init__(**kw)
-        for name, data in raw_data.items():
-            self.add(data, name)
+        self.column_names[:] = list(raw_data.keys())
+        self.data.update(raw_data)
 
     @staticmethod
     def _data_from_df(df):
@@ -109,19 +118,19 @@ class ColumnDataSource(ColumnarDataSource):
             df (DataFrame) : data to convert
 
         Returns:
-            dict(str, list)
+            dict[str, np.array]
 
         '''
-        index = df.index
-        new_data = {}
-        for colname in df:
-            new_data[colname] = df[colname].tolist()
+        _df = df.copy()
+        index = _df.index
+        new_data = _df.to_dict('series')
+
         if index.name:
-            new_data[index.name] = index.tolist()
+            new_data[index.name] = index.values
         elif index.names and not all([x is None for x in index.names]):
-            new_data["_".join(index.names)] = index.tolist()
+            new_data["_".join(index.names)] = index.values
         else:
-            new_data["index"] = index.tolist()
+            new_data["index"] = index.values
         return new_data
 
     @classmethod
@@ -133,7 +142,7 @@ class ColumnDataSource(ColumnarDataSource):
             data (DataFrame) : data to convert
 
         Returns:
-            dict[str, list]
+            dict[str, np.array]
 
         '''
         return cls._data_from_df(data)

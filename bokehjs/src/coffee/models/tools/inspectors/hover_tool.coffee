@@ -1,13 +1,13 @@
 import {InspectTool, InspectToolView} from "./inspect_tool"
 import {Tooltip} from "../../annotations/tooltip"
 import {GlyphRenderer} from "../../renderers/glyph_renderer"
-import * as hittest from "../../../core/hittest"
-import {logger} from "../../../core/logging"
-import {replace_placeholders} from "../../../core/util/templating"
-import {div, span} from "../../../core/dom"
-import * as p from "../../../core/properties"
-import {values, isEmpty} from "../../../core/util/object"
-import {isString, isFunction} from "../../../core/util/types"
+import * as hittest from "core/hittest"
+import {logger} from "core/logging"
+import {replace_placeholders} from "core/util/templating"
+import {div, span} from "core/dom"
+import * as p from "core/properties"
+import {values, isEmpty} from "core/util/object"
+import {isString, isFunction} from "core/util/types"
 
 _color_to_hex = (color) ->
   if (color.substr(0, 1) == '#')
@@ -147,8 +147,8 @@ export class HoverToolView extends InspectToolView
 
     for i in indices['1d'].indices
       # multiglyphs will set '1d' and '2d' results, but have different tooltips
-      if not isEmpty(indices['2d'])
-        for i, [j] of indices['2d']
+      if not isEmpty(indices['2d'].indices)
+        for i, [j] of indices['2d'].indices
           data_x = renderer.glyph._xs[i][j]
           data_y = renderer.glyph._ys[i][j]
 
@@ -305,7 +305,7 @@ export class HoverTool extends InspectTool
       names:        [ p.Array,  []             ]
       mode:         [ p.String, 'mouse'        ] # TODO (bev)
       point_policy: [ p.String, 'snap_to_data' ] # TODO (bev) "follow_mouse", "none"
-      line_policy:  [ p.String, 'prev'         ] # TODO (bev) "next", "nearest", "interp", "none"
+      line_policy:  [ p.String, 'nearest'      ] # TODO (bev) "next", "nearest", "interp", "none"
       show_arrow:   [ p.Boolean, true          ]
       anchor:       [ p.String, 'center'       ] # TODO: enum
       attachment:   [ p.String, 'horizontal'   ] # TODO: enum

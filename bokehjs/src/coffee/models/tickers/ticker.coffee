@@ -1,6 +1,6 @@
 import {Model} from "../../model"
-import {range} from "../../core/util/array"
-import {isStrictNaN} from "../../core/util/types"
+import {range} from "core/util/array"
+import {isStrictNaN} from "core/util/types"
 
 # The base class for all Ticker objects.  It needs to be subclassed before
 # being used.  The simplest subclass is SingleIntervalTicker.
@@ -18,12 +18,12 @@ export class Ticker extends Model
   type: 'Ticker'
 
   # Generates a nice series of ticks for a given range.
-  get_ticks: (data_low, data_high, range, {desired_n_ticks}) ->
-    return @get_ticks_no_defaults(data_low, data_high, @desired_num_ticks)
+  get_ticks: (data_low, data_high, range, cross_loc, {desired_n_ticks}) ->
+    return @get_ticks_no_defaults(data_low, data_high, cross_loc, @desired_num_ticks)
 
   # The version of get_ticks() that does the work (and the version that
   # should be overridden in subclasses).
-  get_ticks_no_defaults: (data_low, data_high, desired_n_ticks) ->
+  get_ticks_no_defaults: (data_low, data_high, cross_loc, desired_n_ticks) ->
     interval = @get_interval(data_low, data_high, desired_n_ticks)
     start_factor = Math.floor(data_low / interval)
     end_factor   = Math.ceil(data_high / interval)

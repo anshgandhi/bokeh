@@ -1,16 +1,12 @@
-import * as rbush from "rbush"
-
-import {CategoricalMapper} from "../mappers/categorical_mapper"
-import * as p from "../../core/properties"
-import * as bbox from "../../core/util/bbox"
-import * as proj from "../../core/util/projections"
-import {BokehView} from "../../core/bokeh_view"
+import * as p from "core/properties"
+import * as bbox from "core/util/bbox"
+import * as proj from "core/util/projections"
+import {BokehView} from "core/bokeh_view"
 import {Model} from "../../model"
-import {Visuals} from "../../core/visuals"
-import * as bokehgl from "./webgl/main"
-import {logger} from "../../core/logging"
-import {extend} from "../../core/util/object"
-import {isString, isArray} from "../../core/util/types"
+import {Visuals} from "core/visuals"
+import {logger} from "core/logging"
+import {extend} from "core/util/object"
+import {isString, isArray} from "core/util/types"
 
 export class GlyphView extends BokehView
 
@@ -24,11 +20,21 @@ export class GlyphView extends BokehView
     # and not done if it isn't ever set, but for now it only
     # matters in the unit tests because we build a view without a
     # renderer there)
-    if @renderer?.plot_view?
-      ctx = @renderer.plot_view.canvas_view.ctx
-      if ctx.glcanvas?
-        Cls = bokehgl[@model.type + 'GLGlyph']
-        if Cls
+    ctx = @renderer.plot_view.canvas_view.ctx
+
+    if ctx.glcanvas?
+      try
+        glglyphs = require("models/glyphs/webgl/index")
+      catch e
+        if e.code == 'MODULE_NOT_FOUND'
+          logger.warn('WebGL was requested and is supported, but bokeh-gl(.min).js is not available, falling back to 2D rendering.')
+          glglyphs = null
+        else
+          throw e
+
+      if glglyphs?
+        Cls = glglyphs[@model.type + 'GLGlyph']
+        if Cls?
           @glglyph = new Cls(ctx.glcanvas.gl, @)
 
   set_visuals: (source) ->
@@ -38,23 +44,19 @@ export class GlyphView extends BokehView
       @glglyph.set_visuals_changed()
 
   render: (ctx, indices, data) ->
-    if @model.visible
-      ctx.beginPath()
+    ctx.beginPath()
 
-      if @glglyph?
-        if @glglyph.render(ctx, indices, data)
-          return
+    if @glglyph?
+      if @glglyph.render(ctx, indices, data)
+        return
 
-      @_render(ctx, indices, data)
-
-    return
+    @_render(ctx, indices, data)
 
   bounds: () ->
     if not @index?
       return bbox.empty()
-    d = @index.data
-    bb = {minX: d.minX, minY: d.minY, maxX: d.maxX, maxY: d.maxY}
-    return @_bounds(bb)
+    else
+      return @_bounds(@index.bbox)
 
   log_bounds: () ->
     if not @index?
@@ -94,32 +96,6 @@ export class GlyphView extends BokehView
   # snapping to a patch centroid, e.g, should override these
   scx: (i) -> return @sx[i]
   scy: (i) -> return @sy[i]
-
-  _xy_index: () ->
-    index = rbush()
-    pts = []
-
-    # if the range is categorical, map to synthetic coordinates first
-    if @renderer.xmapper instanceof CategoricalMapper
-      xx = @renderer.xmapper.v_map_to_target(@_x, true)
-    else
-      xx = @_x
-    if @renderer.ymapper instanceof CategoricalMapper
-      yy = @renderer.ymapper.v_map_to_target(@_y, true)
-    else
-      yy = @_y
-
-    for i in [0...xx.length]
-      x = xx[i]
-      if isNaN(x) or not isFinite(x)
-        continue
-      y = yy[i]
-      if isNaN(y) or not isFinite(y)
-        continue
-      pts.push({minX: x, minY: y, maxX: x, maxY: y, i: i})
-
-    index.load(pts)
-    return index
 
   sdist: (mapper, pts, spans, pts_location="edge", dilate=false) ->
     if isString(pts[0])
@@ -258,10 +234,6 @@ export class Glyph extends Model
       result[y] = [ p.NumberSpec ]
 
     @define(result)
-
-  @define {
-    visible: [ p.Bool, true ]
-  }
 
   @internal {
     x_range_name: [ p.String,      'default' ]

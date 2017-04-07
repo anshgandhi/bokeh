@@ -1,7 +1,7 @@
 import {ImagePool} from "./image_pool"
 import {ProjectionUtils} from "./tile_utils"
-import {logger} from "../../core/logging"
-import * as p from "../../core/properties"
+import {logger} from "core/logging"
+import * as p from "core/properties"
 import {Model} from "../../model"
 
 export class TileSource extends Model
@@ -95,16 +95,16 @@ export class TileSource extends Model
     return image_url.replace("{X}", x).replace('{Y}', y).replace("{Z}", z)
 
   retain_neighbors: (reference_tile) ->
-    throw Error("Not Implemented")
+    throw new Error("Not Implemented")
 
   retain_parents: (reference_tile) ->
-    throw Error("Not Implemented")
+    throw new Error("Not Implemented")
 
   retain_children: (reference_tile) ->
-    throw Error("Not Implemented")
+    throw new Error("Not Implemented")
 
   tile_xyz_to_quadkey: (x, y, z) ->
-    throw Error("Not Implemented")
+    throw new Error("Not Implemented")
 
   quadkey_to_tile_xyz: (quadkey) ->
-    throw Error("Not Implemented")
+    throw new Error("Not Implemented")

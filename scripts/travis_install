@@ -10,7 +10,7 @@ MINICONDA_URL="http://repo.continuum.io/miniconda/$MINICONDA.sh"
 
 PINNED_PKGS=$(cat <<EOF
 notebook ==4.2.3
-matplotlib <2.0
+matplotlib ==1.5.3
 EOF
 )
 
@@ -22,7 +22,7 @@ python -V
 
 echo -e "$PINNED_PKGS" > $HOME/miniconda/conda-meta/pinned
 
-DEPS_TRAVIS="python=$TRAVIS_PYTHON_VERSION conda=4.3.4 conda-env=2.6.0 conda-build=2.1.1"
+DEPS_TRAVIS="python=$TRAVIS_PYTHON_VERSION conda=4.3.11 conda-env=2.6.0 conda-build=2.1.4"
 conda install --yes $DEPS_TRAVIS
 
 conda config --set auto_update_conda off
@@ -43,6 +43,10 @@ npm install
 popd
 
 python setup.py --quiet install --build-js
+
+pushd bokehjs
+node_modules/.bin/gulp examples --no-build
+popd
 
 DEPS_RUN=$(cat <<EOF | python -
 from conda_build.metadata import MetaData
