@@ -7,7 +7,7 @@ export class PolySelectToolView extends SelectToolView
 
   initialize: (options) ->
     super(options)
-    @listenTo(@model, 'change:active', @_active_change)
+    @connect(@model.properties.active.change, () -> @_active_change())
     @data = {vx: [], vy: []}
 
   _active_change: () ->
@@ -20,7 +20,8 @@ export class PolySelectToolView extends SelectToolView
 
   _doubletap: (e)->
     append = e.srcEvent.shiftKey ? false
-    @_select(@data.vx, @data.vy, true, append)
+    @_do_select(@data.vx, @data.vy, true, append)
+    @plot_view.push_state('poly_select', {selection: @plot_view.get_selection()})
 
     @_clear_data()
 
@@ -38,33 +39,41 @@ export class PolySelectToolView extends SelectToolView
 
     @model.overlay.update({xs: copy(@data.vx), ys: copy(@data.vy)})
 
-  _select: (vx, vy, final, append) ->
+  _do_select: (vx, vy, final, append) ->
     geometry = {
       type: 'poly'
       vx: vx
       vy: vy
     }
+    @_select(geometry, final, append)
 
-    for r in @model.computed_renderers
-      ds = r.data_source
-      sm = ds.selection_manager
-      sm.select(@, @plot_view.renderer_views[r.id], geometry, final, append)
+  _emit_callback: (geometry) ->
+    r = @computed_renderers[0]
+    canvas = @plot_model.canvas
+    frame = @plot_model.frame
 
-    @_save_geometry(geometry, final, append)
-    @plot_view.push_state('poly_select', {selection: @plot_view.get_selection()})
+    geometry['sx'] = canvas.v_vx_to_sx(geometry.vx)
+    geometry['sy'] = canvas.v_vx_to_sx(geometry.vy)
 
-    return null
+    xscale = frame.xscales[r.x_range_name]
+    yscale = frame.yscales[r.y_range_name]
+    geometry['x'] = xscale.v_invert(geometry.vx)
+    geometry['y'] = xscale.v_invert(geometry.vy)
+
+    @model.callback.execute(@model, {geometry: geometry})
+
+    return
 
 DEFAULT_POLY_OVERLAY = () -> new PolyAnnotation({
   level: "overlay"
   xs_units: "screen"
   ys_units: "screen"
-  fill_color: "lightgrey"
-  fill_alpha: 0.5
-  line_color: "black"
-  line_alpha: 1.0
-  line_width: 2
-  line_dash: [4, 4]
+  fill_color: {value: "lightgrey"}
+  fill_alpha: {value: 0.5}
+  line_color: {value: "black"}
+  line_alpha: {value: 1.0}
+  line_width: {value: 2}
+  line_dash: {value: [4, 4]}
 })
 
 export class PolySelectTool extends SelectTool
@@ -76,5 +85,6 @@ export class PolySelectTool extends SelectTool
   default_order: 11
 
   @define {
-      overlay: [ p.Instance, DEFAULT_POLY_OVERLAY ]
+      callback:   [ p.Instance                       ]
+      overlay:    [ p.Instance, DEFAULT_POLY_OVERLAY ]
     }

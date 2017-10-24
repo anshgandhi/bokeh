@@ -10,9 +10,9 @@ from bokeh.models import (
     LassoSelectTool,
     Legend,
     LinearAxis,
+    LogScale,
     PanTool,
     ResetTool,
-    ResizeTool,
     Title,
 )
 
@@ -115,11 +115,11 @@ class TestFigure(unittest.TestCase):
     def test_log_axis(self):
         p = plt.figure(x_axis_type='log')
         p.circle([1, 2, 3], [1, 2, 3])
-        self.assertEqual(p.x_mapper_type, 'log')
+        self.assertIsInstance(p.x_scale, LogScale)
 
         p = plt.figure(y_axis_type='log')
         p.circle([1, 2, 3], [1, 2, 3])
-        self.assertEqual(p.y_mapper_type, 'log')
+        self.assertIsInstance(p.y_scale, LogScale)
 
     def test_xgrid(self):
         p = plt.figure()
@@ -139,9 +139,9 @@ class TestFigure(unittest.TestCase):
         self.assertEqual(len(p.grid), 2)
 
     def test_tools(self):
-        TOOLS = "resize,pan,box_zoom,reset,lasso_select"
+        TOOLS = "pan,box_zoom,reset,lasso_select"
         fig = plt.figure(tools=TOOLS)
-        expected = [ResizeTool, PanTool, BoxZoomTool, ResetTool, LassoSelectTool]
+        expected = [PanTool, BoxZoomTool, ResetTool, LassoSelectTool]
 
         self.assertEqual(len(fig.tools), len(expected))
         for i, _type in enumerate(expected):

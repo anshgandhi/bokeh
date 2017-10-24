@@ -1,8 +1,8 @@
 import {Models} from "./base"
 import {version as js_version} from "./version"
-import {EQ, Solver, Variable} from "./core/layout/solver"
 import {logger} from "./core/logging"
 import {HasProps} from "./core/has_props"
+import {Signal} from "./core/signaling"
 import {is_ref} from "./core/util/refs"
 import {decode_column_data} from "./core/util/serialization"
 import {MultiDict, Set} from "./core/util/data_structures"
@@ -10,25 +10,35 @@ import {difference, intersection} from "./core/util/array"
 import {extend, values} from "./core/util/object"
 import {isEqual} from "./core/util/eq"
 import {isArray, isObject} from "./core/util/types"
+import {LayoutDOM} from "./models/layouts/layout_dom"
 import {ColumnDataSource} from "./models/sources/column_data_source"
 
-class EventManager
-    # Dispatches events to the subscribed models
+`
+export class EventManager {
+  // Dispatches events to the subscribed models
 
-  constructor: (@document) ->
-    @session = null
-    @subscribed_models = new Set()
+  session: ClientSession | null = null
+  subscribed_models: Set<string> = new Set()
 
-  send_event: (event) ->
-    # Send message to Python via session
-    @session?.send_event(event)
+  constructor(readonly document: any /* Document */) {}
 
-  trigger: (event) ->
-    for model_id in @subscribed_models.values
-      if event.model_id != null and event.model_id != model_id
+  send_event(event: any): void {
+    // Send message to Python via session
+    if (this.session != null)
+      this.session.send_event(event)
+  }
+
+  trigger(event: any): void {
+    for (const model_id of this.subscribed_models.values) {
+      if (event.model_id != null && event.model_id !== model_id)
         continue
-      model = @document._all_models[model_id]
-      model?._process_event(event)
+      const model = this.document._all_models[model_id]
+      if (model != null)
+        model._process_event(event)
+    }
+  }
+}
+`
 
 export class DocumentChangedEvent
   constructor : (@document) ->
@@ -91,83 +101,44 @@ export class RootRemovedEvent extends DocumentChangedEvent
       'model' : @model.ref()
     }
 
+export documents = []
+
 export DEFAULT_TITLE = "Bokeh Application"
 
 # This class should match the API of the Python Document class
 # as much as possible.
 export class Document
 
-  constructor : () ->
+  constructor: () ->
+    documents.push(this)
     @_title = DEFAULT_TITLE
     @_roots = []
     @_all_models = {}
     @_all_models_by_name = new MultiDict()
     @_all_models_freeze_count = 0
     @_callbacks = []
-    @_doc_width = new Variable("document_width")
-    @_doc_height = new Variable("document_height")
-    @_solver = new Solver()
-    @_init_solver()
-
     @event_manager = new EventManager(@)
-    window.addEventListener("resize", () => @resize())
+    @idle = new Signal(this, "idle") # <void, this>
+    @_idle_roots = new WeakMap() # TODO: WeakSet would be better
 
-  _init_solver : () ->
-    @_solver.clear()
-    @_solver.add_edit_variable(@_doc_width)
-    @_solver.add_edit_variable(@_doc_height)
-    for model in @_roots
-      if model.layoutable
-        @_add_layoutable(model)
+  Object.defineProperty(@prototype, "layoutables", {
+    get: () -> (root for root in @_roots when root instanceof LayoutDOM)
+  })
 
-  solver: () ->
-    @_solver
+  Object.defineProperty(@prototype, "is_idle", {
+    get: () ->
+      for root in @layoutables
+        if not @_idle_roots.has(root)
+          return false
 
-  resize: (width=null, height=null) ->
-    # Notes on resizing (xx:yy means event yy on object xx):
-    # window:event -> document.resize() -> solver:resize
-    #   -> LayoutDOM.render()
-    #   -> PlotCanvas.resize() -> solver:update_layout
+      return true
+  })
 
-    # Ideally the solver would settle in one pass (can that be done?),
-    # but it currently needs two passes to get it right.
-    # Seems to be needed everywhere on initialization, and on Windows
-    # it seems necessary on each Draw
-    @_resize(width, height)
-    @_resize(width, height)
+  notify_idle: (model) ->
+    @_idle_roots.set(model, true)
 
-  _resize: (width=null, height=null) ->
-    for root in @_roots
-      if root.layoutable isnt true
-        continue
-
-      vars = root.get_constrained_variables()
-      if not vars.width? and not vars.height?
-        continue
-
-      # Find the html element
-      root_div = document.getElementById("modelid_#{root.id}")
-
-      # Start working upwards until you find a height to pin against - usually .bk-root
-      if root_div? and width == null
-        measuring = root_div
-        while true
-          measuring = measuring.parentNode
-          {width, height} = measuring.getBoundingClientRect()
-          if height != 0
-            break
-
-      # Set the constraints on root
-      if vars.width?
-        logger.debug("Suggest width on Document -- #{width}")
-        @_solver.suggest_value(@_doc_width, width)
-      if vars.height?
-        logger.debug("Suggest height on Document -- #{height}")
-        @_solver.suggest_value(@_doc_height, height)
-
-    # Finally update everything only once.
-    @_solver.update_variables(false)
-    @_solver.trigger('resize')
+    if @is_idle
+      @idle.emit()
 
   clear : () ->
     @_push_all_models_freeze()
@@ -243,29 +214,7 @@ export class Document
 
     @_all_models = recomputed
 
-  roots : () ->
-    @_roots
-
-  _add_layoutable: (model) ->
-    if model.layoutable isnt true
-      throw new Error("Cannot add non-layoutable - #{model}")
-
-    editables = model.get_edit_variables()
-    constraints = model.get_constraints()
-    vars = model.get_constrained_variables()
-
-    for {edit_variable, strength} in editables
-      @_solver.add_edit_variable(edit_variable, strength)
-
-    for constraint in constraints
-      @_solver.add_constraint(constraint)
-
-    if vars.width?
-      @_solver.add_constraint(EQ(vars.width, @_doc_width))
-    if vars.height?
-      @_solver.add_constraint(EQ(vars.height, @_doc_height))
-
-    @_solver.update_variables()
+  roots: () -> @_roots
 
   add_root : (model, setter_id) ->
     logger.debug("Adding root: #{model}")
@@ -276,11 +225,8 @@ export class Document
     @_push_all_models_freeze()
     try
       @_roots.push(model)
-      model._is_root = true # TODO get rid of this?
     finally
       @_pop_all_models_freeze()
-
-    @_init_solver()
 
     @_trigger_on_change(new RootAddedEvent(@, model, setter_id))
 
@@ -292,11 +238,8 @@ export class Document
     @_push_all_models_freeze()
     try
       @_roots.splice(i, 1)
-      model._is_root = false
     finally
       @_pop_all_models_freeze()
-
-    @_init_solver()
 
     @_trigger_on_change(new RootRemovedEvent(@, model, setter_id))
 
@@ -453,12 +396,12 @@ export class Document
     # this first pass removes all 'refs' replacing them with real instances
     foreach_depth_first to_update, (instance, attrs, was_new) ->
       if was_new
-        instance.setv(attrs)
+        instance.setv(attrs, {silent: true})
 
     # after removing all the refs, we can run the initialize code safely
     foreach_depth_first to_update, (instance, attrs, was_new) ->
       if was_new
-        instance.initialize(attrs)
+        instance.finalize(attrs)
 
   @_event_for_attribute_change: (changed_obj, key, new_value, doc, value_refs) ->
       changed_model = doc.get_model_by_id(changed_obj.id)
@@ -634,10 +577,7 @@ export class Document
       events: json_events,
       references: Document._references_json(values(references))
 
-  apply_json_patch_string: (patch) ->
-    @apply_json_patch(JSON.parse(patch))
-
-  apply_json_patch: (patch, setter_id) ->
+  apply_json_patch: (patch, buffers, setter_id) ->
     references_json = patch['references']
     events_json = patch['events']
     references = Document._instantiate_references_json(references_json, @_all_models)
@@ -673,12 +613,30 @@ export class Document
           patched_obj = @_all_models[patched_id]
           attr = event_json['attr']
           model_type = event_json['model']['type']
+          # XXXX currently still need this first branch, some updates (initial?) go through here
           if attr == 'data' and model_type == 'ColumnDataSource'
-            [data, shapes] = decode_column_data(event_json['new'])
+            [data, shapes] = decode_column_data(event_json['new'], buffers)
             patched_obj.setv({_shapes: shapes, data: data}, {setter_id: setter_id})
           else
             value = Document._resolve_refs(event_json['new'], old_references, new_references)
             patched_obj.setv({ "#{attr}" : value }, {setter_id: setter_id})
+
+        when 'ColumnDataChanged'
+          column_source_id = event_json['column_source']['id']
+          if column_source_id not of @_all_models
+            throw new Error("Cannot stream to #{column_source_id} which is not in the document")
+          column_source = @_all_models[column_source_id]
+          [data, shapes] = decode_column_data(event_json['new'], buffers)
+
+          if event_json['cols']?
+            for k of column_source.data
+              if k not of data
+                data[k] =  column_source.data[k]
+            for k of column_source._shapes
+              if k not of shapes
+                shapes[k] = column_source._shapes[k]
+
+          column_source.setv({_shapes: shapes, data: data}, {setter_id: setter_id, check_eq: false})
 
         when 'ColumnsStreamed'
           column_source_id = event_json['column_source']['id']

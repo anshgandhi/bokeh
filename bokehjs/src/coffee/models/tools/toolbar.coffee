@@ -14,7 +14,7 @@ export class Toolbar extends ToolbarBase
 
   initialize: (attrs, options) ->
     super(attrs, options)
-    @listenTo(@, 'change:tools', @_init_tools)
+    @connect(@properties.tools.change, () -> @_init_tools())
     @_init_tools()
 
   _init_tools: () ->
@@ -38,7 +38,24 @@ export class Toolbar extends ToolbarBase
 
         if not any(@gestures[et].tools, (t) => t.id == tool.id)
           @gestures[et].tools = @gestures[et].tools.concat([tool])
-        @listenTo(tool, 'change:active', @_active_change.bind(tool))
+        @connect(tool.properties.active.change, @_active_change.bind(null, tool))
+
+    if @active_inspect == 'auto'
+      # do nothing as all tools are active be default
+      ;
+    else if @active_inspect instanceof InspectTool
+      @inspectors.map((inspector) => if inspector != @active_inspect then inspector.active = false)
+    else if @active_inspect instanceof Array
+      @inspectors.map((inspector) => if inspector not in @active_inspect then inspector.active = false)
+    else if @active_inspect is null
+      @inspectors.map((inspector) -> inspector.active = false)
+
+    _activate_gesture = (tool) =>
+      if tool.active
+        # tool was activated by a proxy, but we need to finish configuration manually
+        @_active_change(tool)
+      else
+        tool.active = true
 
     for et of @gestures
       tools = @gestures[et].tools
@@ -50,25 +67,28 @@ export class Toolbar extends ToolbarBase
         if @active_tap is null
           continue
         if @active_tap is 'auto'
-          @gestures[et].tools[0].active = true
+          _activate_gesture(@gestures[et].tools[0])
         else
-          @active_tap.active = true
+          _activate_gesture(@active_tap)
 
       if et == 'pan'
         if @active_drag is null
           continue
         if @active_drag is 'auto'
-          @gestures[et].tools[0].active = true
+          _activate_gesture(@gestures[et].tools[0])
         else
-          @active_drag.active = true
+          _activate_gesture(@active_drag)
 
       if et in ['pinch', 'scroll']
         if @active_scroll is null or @active_scroll is 'auto'
           continue
-        @active_scroll.active = true
+        _activate_gesture(@active_scroll)
+
+    return null # XXX
 
   @define {
-      active_drag:   [ p.Any, 'auto' ]
-      active_scroll: [ p.Any, 'auto' ]
-      active_tap:    [ p.Any, 'auto' ]
+      active_drag:     [ p.Any, 'auto' ]
+      active_inspect:  [ p.Any, 'auto' ]
+      active_scroll:   [ p.Any, 'auto' ]
+      active_tap:      [ p.Any, 'auto' ]
   }

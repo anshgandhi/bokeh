@@ -8,18 +8,16 @@ Introduction
 
 Bokeh is a Python interactive visualization library that targets modern web
 browsers for presentation. Bokeh provides elegant, concise construction of
-novel graphics with high-performance interactivity over very large or streaming
-datasets in a quick and easy way.
+novel graphics with high-performance interactivity over very large or
+streaming datasets in a quick and easy way.
 
 To offer both simplicity and the powerful and flexible features needed for
-advanced customizations, Bokeh exposes three interface levels to users:
+advanced customizations, Bokeh exposes two interface levels to users:
 
 * a *low-level* |bokeh.models| interface that provides the most flexibility to
   application developers.
-* an *intermediate-level* |bokeh.plotting| interface centered around composing
+* an *higher-level* |bokeh.plotting| interface centered around composing
   visual glyphs.
-* a *high-level* |bokeh.charts| interface to build complex statistical plots
-  quickly and simply.
 
 This Quickstart focuses on the |bokeh.plotting| interface.
 
@@ -59,8 +57,8 @@ detailed information please consult the full :ref:`userguide`.
 
 Let's begin with some examples.
 
-Plotting data in basic Python lists as a line chart including zoom,
-pan, resize, save, and other tools is simple and straightforward:
+Plotting data in basic Python lists as a line plot including zoom,
+pan, save, and other tools is simple and straightforward:
 
 .. bokeh-plot::
     :source-position: above
@@ -166,6 +164,21 @@ which show how Bokeh can be used together with Jupyter interactive widgets:
 :bokeh-tree:`examples/howto/notebook_comms/Jupyter Interactors.ipynb`
 
 :bokeh-tree:`examples/howto/notebook_comms/Numba Image Example.ipynb`
+
+Zeppelin Notebooks
+==================
+
+At this point we should mention `Apache Zeppelin`_ notebooks.
+
+`Apache Zeppelin`_ is a web-based notebook that enables interactive data analytics.
+You can make beautiful data-driven, interactive and collaborative documents with
+SQL, Scala and more. It is widely used across the Spark community. Bokeh integrates
+seamlessly with Zeppelin notebooks. To view the above examples in a notebook, you
+would only need change |output_file| to |output_notebook| (notebook_type='zeppelin')
+instead.
+
+The usage of bokeh in Zeppelin notebook is no difference from Jupyter except you
+need to specify notebook_type as zeppelin.
 
 .. _quickstart_other_languages:
 
@@ -296,7 +309,7 @@ for in this example:
     # output to static HTML file (with CDN resources)
     output_file("color_scatter.html", title="color_scatter.py example", mode="cdn")
 
-    TOOLS="resize,crosshair,pan,wheel_zoom,box_zoom,reset,box_select,lasso_select"
+    TOOLS="crosshair,pan,wheel_zoom,box_zoom,reset,box_select,lasso_select"
 
     # create a new plot with the tools above, and explicit ranges
     p = figure(tools=TOOLS, x_range=(0,100), y_range=(0,100))
@@ -485,7 +498,7 @@ but you can see (and interact with) a simple Bokeh server app below:
 
     <div>
     <iframe
-        src="http://demo.bokehplots.com/apps/sliders/#"
+        src="https://demo.bokehplots.com/apps/sliders/#"
         frameborder="0"
         style="overflow:hidden;height:460px;width: 120%;
         -moz-transform: scale(0.85, 0.85);
@@ -533,18 +546,18 @@ Visit the `Bokeh GitHub repository`_ and try the examples.
 Be sure to follow us on Twitter `@bokehplots <Twitter_>`_, as well as on
 `Vine`_, and `Youtube`_!
 
-.. _Anaconda Python distribution: http://continuum.io/anaconda
+.. _Anaconda Python distribution: http://anaconda.com/anaconda
 .. _Bokeh for Julia: https://github.com/bokeh/Bokeh.jl
 .. _Bokeh for R: http://hafen.github.io/rbokeh/
 .. _Bokeh for Scala: https://github.com/bokeh/bokeh-scala
 .. _Bokeh GitHub repository: https://github.com/bokeh/bokeh
-.. _Bokeh mailing list: https://groups.google.com/a/continuum.io/forum/#!forum/bokeh
+.. _Bokeh mailing list: https://groups.google.com/a/anaconda.com/forum/#!forum/bokeh
 .. _Bokeh NBViewer Gallery: http://nbviewer.ipython.org/github/bokeh/bokeh-notebooks/blob/master/index.ipynb
 .. _Twitter: http://twitter.com/BokehPlots
 .. _Vine: https://vine.co/bokehplots
 .. _YouTube: https://www.youtube.com/channel/UCK0rSk29mmg4UT4bIOvPYhw
+.. _Apache Zeppelin: http://zeppelin.apache.org
 
-.. |bokeh.charts|   replace:: :ref:`bokeh.charts <bokeh.charts>`
 .. |bokeh.models|   replace:: :ref:`bokeh.models <bokeh.models>`
 .. |bokeh.plotting| replace:: :ref:`bokeh.plotting <bokeh.plotting>`
 

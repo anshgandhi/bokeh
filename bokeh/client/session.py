@@ -1,44 +1,123 @@
-'''
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
+#
+# Powered by the Bokeh Development Team.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
+''' Provide a session object to service Bokeh documents in external Python
+clients to a Bokeh server.
+
+Use-Cases
+~~~~~~~~~
+
+A client session has two primary uses:
+
+* Implementing automated testing infrastructure around Bokeh server
+  applications.
+
+* Creating and customizing specific sessions of a Bokeh server application
+  (running *in the Bokeh server*) before passing them on to a specific
+  viewer.
+
+Note About "External" Applications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{warning}
 
 '''
-from __future__ import absolute_import, print_function
+
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 log = logging.getLogger(__name__)
 
+from bokeh.util.api import public, internal ; public, internal
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
+
+# External imports
+from six.moves.urllib.parse import quote_plus
+
+# Bokeh imports
 from ..document import Document
 from ..resources import _SessionCoordinates, DEFAULT_SERVER_HTTP_URL
-from ..util.deprecation import deprecated
+from ..util.browser import NEW_PARAM
 from ..util.session_id import generate_session_id
+from ..util.string import format_docstring
+from .util import server_url_for_websocket_url, websocket_url_for_server_url
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
 DEFAULT_SESSION_ID = "default"
 
-def websocket_url_for_server_url(url):
-    if url.startswith("http:"):
-        reprotocoled = "ws" + url[4:]
-    elif url.startswith("https:"):
-        reprotocoled = "wss" + url[5:]
-    else:
-        raise ValueError("URL has unknown protocol " + url)
-    if reprotocoled.endswith("/"):
-        return reprotocoled + "ws"
-    else:
-        return reprotocoled + "/ws"
-
-def server_url_for_websocket_url(url):
-    if url.startswith("ws:"):
-        reprotocoled = "http" + url[2:]
-    elif url.startswith("wss:"):
-        reprotocoled = "https" + url[3:]
-    else:
-        raise ValueError("URL has non-websocket protocol " + url)
-    if not reprotocoled.endswith("/ws"):
-        raise ValueError("websocket URL does not end in /ws")
-    return reprotocoled[:-2]
-
 DEFAULT_SERVER_WEBSOCKET_URL = websocket_url_for_server_url(DEFAULT_SERVER_HTTP_URL)
 
-def push_session(document, session_id=None, url='default', app_path=None, io_loop=None):
+#-----------------------------------------------------------------------------
+# Public API
+#-----------------------------------------------------------------------------
+
+@public((1,0,0))
+def pull_session(session_id=None, url='default', io_loop=None):
+    ''' Create a session by loading the current server-side document.
+
+    ``session.document`` will be a fresh document loaded from
+    the server. While the connection to the server is open,
+    changes made on the server side will be applied to this
+    document, and changes made on the client side will be
+    synced to the server.
+
+    If you don't plan to modify ``session.document`` you probably
+    don't need to use this function; instead you can directly
+    ``show_session()`` or ``server_session()`` without downloading
+    the session's document into your process first. It's much
+    more efficient to avoid downloading the session if you don't need
+    to.
+
+    In a production scenario, the ``session_id`` should be
+    unique for each browser tab, which keeps users from
+    stomping on each other. It's neither scalable nor secure to
+    use predictable session IDs or to share session IDs across
+    users.
+
+    For a notebook running on a single machine, ``session_id``
+    could be something human-readable such as ``"default"`` for
+    convenience.
+
+    If you allow ``pull_session()`` to generate a unique
+    ``session_id``, you can obtain the generated ID with the
+    ``id`` property on the returned ``ClientSession``.
+
+    Args:
+        session_id (string, optional) :
+            The name of the session, None to autogenerate a random one (default: None)
+
+        url : (str, optional): The URL to a Bokeh application on a Bokeh server
+                can also be `"default"` which will connect to the default app URL
+
+        io_loop (``tornado.ioloop.IOLoop``, optional) :
+            The IOLoop to use for the websocket
+
+    Returns:
+        ClientSession :
+            A new ClientSession connected to the server
+
+    '''
+    coords = _SessionCoordinates(session_id=session_id, url=url)
+    session = ClientSession(session_id=session_id, websocket_url=websocket_url_for_server_url(coords.url), io_loop=io_loop)
+    session.pull()
+    return session
+
+@public((1,0,0))
+def push_session(document, session_id=None, url='default', io_loop=None):
     ''' Create a session by pushing the given document to the server,
     overwriting any existing server-side document.
 
@@ -77,80 +156,13 @@ def push_session(document, session_id=None, url='default', app_path=None, io_loo
             A new ClientSession connected to the server
 
     '''
-    if app_path is not None:
-        deprecated((0, 12, 5), "app_path", "url", "Now pass entire app URLS in the url arguments, e.g. 'url=http://foo.com:5010/bar/myapp''")
-        url = url + app_path
-
     coords = _SessionCoordinates(session_id=session_id, url=url)
     session = ClientSession(session_id=coords.session_id, websocket_url=websocket_url_for_server_url(coords.url), io_loop=io_loop)
     session.push(document)
     return session
 
-def pull_session(session_id=None, url='default', app_path=None, io_loop=None):
-    ''' Create a session by loading the current server-side document.
-
-    ``session.document`` will be a fresh document loaded from
-    the server. While the connection to the server is open,
-    changes made on the server side will be applied to this
-    document, and changes made on the client side will be
-    synced to the server.
-
-    If you don't plan to modify ``session.document`` you probably
-    don't need to use this function; instead you can directly
-    ``show_session()`` or ``autoload_server()`` without downloading
-    the session's document into your process first. It's much
-    more efficient to avoid downloading the session if you don't need
-    to.
-
-    In a production scenario, the ``session_id`` should be
-    unique for each browser tab, which keeps users from
-    stomping on each other. It's neither scalable nor secure to
-    use predictable session IDs or to share session IDs across
-    users.
-
-    For a notebook running on a single machine, ``session_id``
-    could be something human-readable such as ``"default"`` for
-    convenience.
-
-    If you allow ``pull_session()`` to generate a unique
-    ``session_id``, you can obtain the generated ID with the
-    ``id`` property on the returned ``ClientSession``.
-
-    Args:
-        session_id (string, optional) :
-            The name of the session, None to autogenerate a random one (default: None)
-
-        url : (str, optional): The URL to a Bokeh application on a Bokeh server
-                can also be `"default"` which will connect to the default app URL
-
-        io_loop (``tornado.ioloop.IOLoop``, optional) :
-            The IOLoop to use for the websocket
-    Returns:
-        ClientSession :
-            A new ClientSession connected to the server
-
-    '''
-    if app_path is not None:
-        deprecated((0, 12, 5), "app_path", "url", "Now pass entire app URLS in the url arguments, e.g. 'url=http://foo.com:5010/bar/myapp'")
-        url = url + app_path
-
-    coords = _SessionCoordinates(session_id=session_id, url=url)
-    session = ClientSession(session_id=session_id, websocket_url=websocket_url_for_server_url(coords.url), io_loop=io_loop)
-    session.pull()
-    return session
-
-def _encode_query_param(s):
-    try:
-        import urllib
-        return urllib.quote_plus(s)
-    except:
-        # python 3
-        import urllib.parse as parse
-        return parse.quote_plus(s)
-
-_new_param = {'tab': 2, 'window': 1}
-
-def show_session(session_id=None, url='default', app_path=None, session=None, browser=None, new="tab", controller=None):
+@public((1,0,0))
+def show_session(session_id=None, url='default', session=None, browser=None, new="tab", controller=None):
         ''' Open a browser displaying a session document.
 
         If you have a session from ``pull_session()`` or ``push_session`` you
@@ -180,11 +192,6 @@ def show_session(session_id=None, url='default', app_path=None, session=None, br
                 opens a new tab. If **new** is 'window', then opens a new window.
 
         '''
-
-        if app_path is not None:
-            deprecated((0, 12, 5), "app_path", "url", "Now pass entire app URLS in the url arguments, e.g. 'url=http://foo.com:5010/bar/myapp'")
-            url = url + app_path
-
         if session is not None:
             server_url = server_url_for_websocket_url(session._connection.url)
             session_id = session.id
@@ -197,9 +204,10 @@ def show_session(session_id=None, url='default', app_path=None, session=None, br
             from bokeh.util.browser import get_browser_controller
             controller = get_browser_controller(browser=browser)
 
-        controller.open(server_url + "?bokeh-session-id=" + _encode_query_param(session_id),
-                        new=_new_param[new])
+        controller.open(server_url + "?bokeh-session-id=" + quote_plus(session_id),
+                        new=NEW_PARAM[new])
 
+@public((1,0,0))
 class ClientSession(object):
     ''' Represents a websocket connection to a server-side session.
 
@@ -211,15 +219,16 @@ class ClientSession(object):
     '''
 
     def __init__(self, session_id=None, websocket_url=DEFAULT_SERVER_WEBSOCKET_URL, io_loop=None):
-        '''
-        A connection which attaches to a particular named session on the server.
+        ''' A connection which attaches to a particular named session on the
+        server.
 
-        Always call either pull() or push() immediately after creating the session
-        (until these are called session.document will be None).
+        Always call either pull() or push() immediately after creating the
+        session (until these are called ``session.document`` will be ``None``).
 
-        The bokeh.client.push_session() and bokeh.client.pull_session() functions
-        will construct a ClientSession and push or pull in one step, so they are
-        a good way to obtain a ClientSession.
+        The :func:`~bokeh.client.session.push_session` and
+        :func:`~bokeh.client.session.pull_session()` functions will construct a
+        ``ClientSession`` and push or pull in one step, so they are a good way to
+        obtain a ``ClientSession``.
 
         Args:
             session_id (str) :
@@ -228,45 +237,108 @@ class ClientSession(object):
             websocket_url (str) :
                 Websocket URL to connect to
 
-            io_loop (``tornado.ioloop.IOLoop``, optional) :
+            io_loop (IOLoop, optional) :
                 The IOLoop to use for the websocket
         '''
         self._document = None
         self._id = self._ensure_session_id(session_id)
 
-        from ._connection import ClientConnection
+        from .connection import ClientConnection
         self._connection = ClientConnection(session=self, io_loop=io_loop, websocket_url=websocket_url)
 
         from ..server.callbacks import _DocumentCallbackGroup
         self._callbacks = _DocumentCallbackGroup(self._connection.io_loop)
 
-    def _attach_document(self, document):
-        self._document = document
-        self._document.on_change_dispatch_to(self)
+    # Properties --------------------------------------------------------------
 
-        self._callbacks.add_session_callbacks(self._document.session_callbacks)
+    @property
+    @public((1,0,0))
+    def connected(self):
+        ''' Whether this session is currently connected. '''
+        return self._connection.connected
 
+    @property
+    @public((1,0,0))
+    def document(self):
+        ''' A :class:`~bokeh.document.Document` that will be kept in sync with
+        the corresponding Document on the server.
+
+        This value is initialized when :func:`pull` or :func:`push` succeeds.
+        It will be ``None`` until then.
+
+        '''
+        return self._document
+
+    @property
+    @public((1,0,0))
+    def id(self):
+        ''' A unique ID for this session. '''
+        return self._id
+
+    # Public methods ----------------------------------------------------------
+
+    @public((1,0,0))
+    def connect(self):
+        ''' Connect to a Bokeh server at the configured URL. '''
+        self._connection.connect()
+
+    @public((1,0,0))
+    def close(self, why="closed"):
+        ''' Close the connection to the server. '''
+        self._connection.close(why)
+
+    @public((1,0,0))
+    def force_roundtrip(self):
+        ''' Force a round-trip request/reply to the server, sometimes needed to
+        avoid race conditions. Mostly useful for testing.
+
+        Outside of test suites, this method hurts performance and should not be
+        needed.
+
+        Returns:
+           None
+
+        '''
+        self._connection.force_roundtrip()
+
+    @public((1,0,0))
+    def loop_until_closed(self, suppress_warning=False):
+        ''' Execute a blocking loop that runs and exectutes event callbacks
+        until the connection is closed (e.g. by hitting Ctrl-C).
+
+        While this method can be used to run Bokeh application code "outside"
+        the Bokeh server, this practice is HIGHLY DISCOURAGED for any real
+        use case.
+
+        '''
+        import warnings
+        if not suppress_warning:
+            warnings.warn(_BOKEH_CLIENT_APP_WARNING_FULL)
+        self._connection.loop_until_closed()
+
+    @public((1,0,0))
     def pull(self):
         ''' Pull the server's state and set it as session.document.
 
-            If this is called more than once, session.document will
-            be the same object instance but its contents will be overwritten.
+        If this is called more than once, session.document will be the same
+        object instance but its contents will be overwritten.
 
-            Automatically calls :func:`connect` before pulling.
+        Automatically calls :func:`connect` before pulling.
 
         '''
         self.connect()
-        if not self._connection.connected:
+        if not self.connected:
             raise IOError("Cannot pull session document because we failed to connect to the server (to start the server, try the 'bokeh serve' command)")
 
-        if self._document is None:
+        if self.document is None:
             doc = Document()
         else:
-            doc = self._document
+            doc = self.document
         self._connection.pull_doc(doc)
-        if self._document is None:
+        if self.document is None:
             self._attach_document(doc)
 
+    @public((1,0,0))
     def push(self, document=None):
         ''' Push the given document to the server and record it as session.document.
 
@@ -282,24 +354,35 @@ class ClientSession(object):
                 None to use session.document or create a new document.
 
         '''
-        if self._document is None:
+        if self.document is None:
             if document is None:
                 doc = Document()
             else:
                 doc = document
         else:
             if document is None:
-                doc = self._document
+                doc = self.document
             else:
                 raise ValueError("Cannot push() a different document from existing session.document")
 
         self.connect()
-        if not self._connection.connected:
+        if not self.connected:
             raise IOError("Cannot push session document because we failed to connect to the server (to start the server, try the 'bokeh serve' command)")
         self._connection.push_doc(doc)
         if self._document is None:
             self._attach_document(doc)
 
+    @public((1,0,0))
+    def request_server_info(self):
+        ''' Ask for information about the server.
+
+        Returns:
+            A dictionary of server attributes.
+
+        '''
+        return self._connection.request_server_info()
+
+    @public((1,0,0))
     def show(self, obj=None, browser=None, new="tab"):
         ''' Open a browser displaying this session.
 
@@ -324,60 +407,15 @@ class ClientSession(object):
             self.document.add_root(obj)
         show_session(session=self, browser=browser, new=new)
 
-    @classmethod
-    def _ensure_session_id(cls, session_id):
-        if session_id is None:
-            session_id = generate_session_id()
-        return session_id
+    # Internal methods --------------------------------------------------------
 
-    @property
-    def document(self):
-        ''' :class:`~bokeh.document.Document` which will be kept in sync with the server document
+    # Private methods ---------------------------------------------------------
 
-        This is initialized when :func:`pull` or :func:`push` succeeds. It will be None until then.
+    def _attach_document(self, document):
+        self._document = document
+        self._document.on_change_dispatch_to(self)
 
-        '''
-        return self._document
-
-    @property
-    def id(self):
-        return self._id
-
-    @property
-    def connected(self):
-        return self._connection.connected
-
-    def connect(self):
-        self._connection.connect()
-
-    def close(self, why="closed"):
-        self._connection.close(why)
-
-    def loop_until_closed(self):
-        self._connection.loop_until_closed()
-
-    def request_server_info(self):
-        ''' Ask for information about the server.
-
-        Returns:
-            A dictionary of server attributes.
-
-        '''
-        return self._connection.request_server_info()
-
-    def force_roundtrip(self):
-        ''' Used in unit testing to force a request/reply pair in order to avoid races
-
-        '''
-        self._connection.force_roundtrip()
-
-    def _notify_disconnected(self):
-        ''' Called by the ClientConnection we are using to notify us of disconnect.
-
-        '''
-        if self._document is not None:
-            self._document.remove_on_change(self)
-            self._callbacks.remove_all_callbacks()
+        self._callbacks.add_session_callbacks(self._document.session_callbacks)
 
     def _document_patched(self, event):
         if event.setter is self:
@@ -390,11 +428,62 @@ class ClientSession(object):
         # other and their final states will differ.
         self._connection._send_patch_document(self._id, event)
 
+    @classmethod
+    def _ensure_session_id(cls, session_id):
+        if session_id is None:
+            session_id = generate_session_id()
+        return session_id
+
     def _handle_patch(self, message):
         message.apply_to_document(self.document, self)
+
+    def _notify_disconnected(self):
+        ''' Called by the ClientConnection we are using to notify us of disconnect.
+
+        '''
+        if self.document is not None:
+            self.document.remove_on_change(self)
+            self._callbacks.remove_all_callbacks()
 
     def _session_callback_added(self, event):
         self._callbacks.add_session_callback(event.callback)
 
     def _session_callback_removed(self, event):
         self._callbacks.remove_session_callback(event.callback)
+
+#-----------------------------------------------------------------------------
+# Internal API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+_BOKEH_CLIENT_APP_WARNING_BODY = """
+The use of `session.loop_until_closed` and `push_session` to run Bokeh
+application code outside a Bokeh server is **HIGHLY DISCOURAGED** for any real
+use.
+
+Running application code outside a Bokeh server with bokeh.client in this way
+has (and always will have) several intrinsic drawbacks:
+
+* Fast binary array transport is NOT available! Base64 fallback is much slower
+* All network traffic is DOUBLED due to extra hop between client and server
+* Server *and* client process must be running at ALL TIMES for callbacks to work
+* App code run outside the Bokeh server is NOT SCALABLE behind a load balancer
+
+The bokeh.client API is recommended to use ONLY for testing, or for customizing
+individual sessions running in a full Bokeh server, before passing on to viewers.
+
+For information about different ways of running apps in a Bokeh server, see:
+
+    http://bokeh.pydata.org/en/latest/docs/user_guide/server.html
+"""
+
+_BOKEH_CLIENT_APP_WARNING_FULL = "\n\n    !!!! PLEASE NOTE !!!!\n" + _BOKEH_CLIENT_APP_WARNING_BODY
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------
+
+__doc__ = format_docstring(__doc__, warning=_BOKEH_CLIENT_APP_WARNING_BODY)

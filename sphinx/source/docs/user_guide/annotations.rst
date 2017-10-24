@@ -100,15 +100,14 @@ information and examples.
 Color Bars
 ~~~~~~~~~~
 
-Users can use a |ColorMapper| instance, which contain a color palette,
-to create a |ColorBar|. Both on and off-plot color bars are supported, users
-just need to specify their desired location when adding the ColorBar to the
-plot.
+A |ColorBar| can be created using a |ColorMapper| instance, which
+contains a color palette. Both on- and off-plot color bars are
+supported; the desired location can be specified when adding the
+|ColorBar| to the plot.
 
 .. note::
-    This example depends on the open source NumPy and matplotlib libraries in
-    order to more easily generate better data suitable for demonstrating
-    legends.
+    This example depends on the open-source NumPy library in order to
+    generate demonstration data.
 
 .. bokeh-plot:: docs/user_guide/examples/plotting_color_bars.py
     :source-position: above
@@ -145,6 +144,18 @@ fill properties. The line properties control the outline of the arrow head,
 and the fill properties control the interior of the arrow head (if applicable).
 
 .. bokeh-plot:: docs/user_guide/examples/plotting_arrow.py
+    :source-position: above
+
+.. _userguide_plotting_bands:
+
+Bands
+~~~~~
+
+A |Band| will create a dimensionally-linked "stripe", either located in data
+or screen coordinates. One common use for the Band annotation is to indicate
+uncertainty related to a series of measurements.
+
+.. bokeh-plot:: docs/user_guide/examples/plotting_band.py
     :source-position: above
 
 .. _userguide_plotting_box_annotations:
@@ -212,6 +223,18 @@ and extend to the edge of the plot area.
 .. bokeh-plot:: docs/user_guide/examples/plotting_span.py
     :source-position: above
 
+.. _userguide_plotting_whiskers:
+
+Whiskers
+~~~~~~~~
+
+A |Whisker| will create a dimensionally-linked "stem", either located in data
+or screen coordinates. Indicating error or uncertainty for measurements at a
+single point would be one common use for the Whisker annotation.
+
+.. bokeh-plot:: docs/user_guide/examples/plotting_whisker.py
+    :source-position: above
+
 .. |bokeh.plotting| replace:: :ref:`bokeh.plotting <bokeh.plotting>`
 
 .. |Plot| replace:: :class:`~bokeh.models.plots.Plot`
@@ -224,6 +247,7 @@ and extend to the edge of the plot area.
 
 .. |Arrow|         replace:: :class:`~bokeh.models.annotations.Arrow`
 .. |ArrowHead|     replace:: :class:`~bokeh.models.arrow_heads.ArrowHead`
+.. |Band|          replace:: :class:`~bokeh.models.annotations.Band`
 .. |BoxAnnotation| replace:: :class:`~bokeh.models.annotations.BoxAnnotation`
 .. |ColorBar|      replace:: :class:`~bokeh.models.annotations.ColorBar`
 .. |Label|         replace:: :class:`~bokeh.models.annotations.Label`
@@ -231,3 +255,4 @@ and extend to the edge of the plot area.
 .. |Legend|        replace:: :class:`~bokeh.models.annotations.Legend`
 .. |Span|          replace:: :class:`~bokeh.models.annotations.Span`
 .. |Title|         replace:: :class:`~bokeh.models.annotations.Title`
+.. |Whisker|       replace:: :class:`~bokeh.models.annotations.Whisker`

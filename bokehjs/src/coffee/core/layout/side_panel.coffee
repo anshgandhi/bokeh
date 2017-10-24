@@ -1,4 +1,4 @@
-import {EQ, GE} from "./solver"
+import {EQ} from "./solver"
 import {LayoutCanvas} from "./layout_canvas"
 
 import * as p from "core/properties"
@@ -106,7 +106,7 @@ _align_lookup = {
     parallel   : CENTER
     normal     : LEFT
     horizontal : CENTER
-    vertical   : RIGHT
+    vertical   : LEFT
   left:
     justified  : CENTER
     parallel   : CENTER
@@ -143,51 +143,28 @@ _align_lookup_positive = {
 #         height or width. Extending to full height or width means it's easy to
 #         calculate mid-way for alignment.
 
-export update_constraints = (view) ->
-  v = view
-
-  if v.model.props.visible?
-    if v.model.visible is false
-      # if not visible, avoid applying constraints until visible again
-      return
-
-  # Constrain size based on contents (may not have changed)
-  size = v._get_size()
-
-  if not v._last_size?
-    v._last_size = -1
-
-  if size == v._last_size
+export update_panel_constraints = (view) ->
+  if view.model.props.visible? and not view.model.visible
+    # if not visible, avoid applying constraints until visible again
     return
 
-  s = v.model.document.solver()
+  s = view.solver
 
-  v._last_size = size
-  if v._size_constraint?
-    s.remove_constraint(v._size_constraint, true)
-  v._size_constraint = GE(v.model.panel._size, -size)
-  s.add_constraint(v._size_constraint)
-
-  # Constrain Full Dimension - link it to the plot (only needs to be done once)
-  # If axis is on the left, then it is the full height of the plot.
-  # If axis is on the top, then it is the full width of the plot.
-  if not v._full_set?
-    v._full_set = false
-  if not v._full_set
-    side = v.model.panel.side
-    if side in ['above', 'below']
-      s.add_constraint(EQ(v.model.panel._width, [-1, v.plot_model.canvas._width]))
-    if side in ['left', 'right']
-      s.add_constraint(EQ(v.model.panel._height, [-1, v.plot_model.canvas._height]))
-    v._full_set = true
-
+  if view._size_constraint? and s.has_constraint(view._size_constraint)
+    s.remove_constraint(view._size_constraint)
+  view._size_constraint = EQ(view.model.panel._size, -view._get_size())
+  s.add_constraint(view._size_constraint)
 
 export class SidePanel extends LayoutCanvas
+  type: "SidePanel"
 
   @internal {
     side: [ p.String ]
     plot: [ p.Instance ]
   }
+
+  toString: () ->
+    return "#{@type}(#{@id}, #{@side})"
 
   initialize: (attrs, options)->
     super(attrs, options)
@@ -196,42 +173,25 @@ export class SidePanel extends LayoutCanvas
         @_dim = 0
         @_normals = [0, -1]
         @_size = @_height
-        @_anchor = @_bottom
       when "below"
         @_dim = 0
         @_normals = [0, 1]
         @_size = @_height
-        @_anchor = @_top
       when "left"
         @_dim = 1
         @_normals = [-1, 0]
         @_size = @_width
-        @_anchor = @_right
       when "right"
         @_dim = 1
         @_normals = [1, 0]
         @_size = @_width
-        @_anchor = @_left
       else
         logger.error("unrecognized side: '#{ @side }'")
 
-  get_constraints: () ->
-    #
-    # TODO (bird): Investigate changing the convention of when constraints are added
-    # so that if a side panel was added later, then these constraints would be
-    # picked up. (This would also play into the ability to remove a panel from
-    # the canvas).
-    #
-    constraints = []
-    constraints.push(GE(@_top))
-    constraints.push(GE(@_bottom))
-    constraints.push(GE(@_left))
-    constraints.push(GE(@_right))
-    constraints.push(GE(@_width))
-    constraints.push(GE(@_height))
-    constraints.push(EQ(@_left, @_width, [-1, @_right]))
-    constraints.push(EQ(@_bottom, @_height, [-1, @_top]))
-    return constraints
+  @getters {
+    is_horizontal: () -> @side == "above" or @side == "below"
+    is_vertical: () -> @side == "left" or @side == "right"
+  }
 
   apply_label_text_heuristics: (ctx, orient) ->
     side = @side

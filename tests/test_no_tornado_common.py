@@ -3,7 +3,6 @@ from __future__ import print_function
 import subprocess
 
 basic_imports = [
-    "import bokeh.charts",
     "import bokeh.client",
     "import bokeh.embed",
     "import bokeh.io",

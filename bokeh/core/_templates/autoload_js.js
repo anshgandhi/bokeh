@@ -15,31 +15,37 @@ calls it with the rendered model.
 :type css_urls: list
 
 #}
-(function(global) {
+(function(root) {
   function now() {
     return new Date();
   }
 
   var force = {{ force|default(False)|json }};
 
-  if (typeof (window._bokeh_onload_callbacks) === "undefined" || force === true) {
-    window._bokeh_onload_callbacks = [];
-    window._bokeh_is_loading = undefined;
+  if (typeof (root._bokeh_onload_callbacks) === "undefined" || force === true) {
+    root._bokeh_onload_callbacks = [];
+    root._bokeh_is_loading = undefined;
   }
 
+  {% block register_mimetype %}
+  {% endblock %}
 
   {% block autoload_init %}
   {% endblock %}
 
   function run_callbacks() {
-    window._bokeh_onload_callbacks.forEach(function(callback) { callback() });
-    delete window._bokeh_onload_callbacks
+    try {
+      root._bokeh_onload_callbacks.forEach(function(callback) { callback() });
+    }
+    finally {
+      delete root._bokeh_onload_callbacks
+    }
     console.info("Bokeh: all callbacks have finished");
   }
 
   function load_libs(js_urls, callback) {
-    window._bokeh_onload_callbacks.push(callback);
-    if (window._bokeh_is_loading > 0) {
+    root._bokeh_onload_callbacks.push(callback);
+    if (root._bokeh_is_loading > 0) {
       console.log("Bokeh: BokehJS is being loaded, scheduling callback at", now());
       return null;
     }
@@ -48,15 +54,15 @@ calls it with the rendered model.
       return null;
     }
     console.log("Bokeh: BokehJS not loaded, scheduling load and callback at", now());
-    window._bokeh_is_loading = js_urls.length;
+    root._bokeh_is_loading = js_urls.length;
     for (var i = 0; i < js_urls.length; i++) {
       var url = js_urls[i];
       var s = document.createElement('script');
       s.src = url;
       s.async = false;
       s.onreadystatechange = s.onload = function() {
-        window._bokeh_is_loading--;
-        if (window._bokeh_is_loading === 0) {
+        root._bokeh_is_loading--;
+        if (root._bokeh_is_loading === 0) {
           console.log("Bokeh: all BokehJS libraries loaded");
           run_callbacks()
         }
@@ -100,12 +106,12 @@ calls it with the rendered model.
   function run_inline_js() {
     {% block run_inline_js %}
     for (var i = 0; i < inline_js.length; i++) {
-      inline_js[i](window.Bokeh);
+      inline_js[i].call(root, root.Bokeh);
     }
     {% endblock %}
   }
 
-  if (window._bokeh_is_loading === 0) {
+  if (root._bokeh_is_loading === 0) {
     console.log("Bokeh: BokehJS loaded, going straight to plotting");
     run_inline_js();
   } else {
@@ -114,4 +120,4 @@ calls it with the rendered model.
       run_inline_js();
     });
   }
-}(this));
+}(window));

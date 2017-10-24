@@ -3,16 +3,14 @@
 '''
 from __future__ import absolute_import
 
-from six import string_types
-
-from ..core.enums import Location
-from ..core.properties import Auto, Bool, Dict, Either, Enum, Include, Instance, Int, List, Override, String
+from ..core.enums import Location, OutputBackend
+from ..core.properties import Bool, Dict, Enum, Include, Instance, Int, List, Override, String, Float
 from ..core.property_mixins import LineProps, FillProps
 from ..core.query import find
 from ..core.validation import error, warning
-from ..core.validation.errors import REQUIRED_RANGE
-from ..core.validation.warnings import (MISSING_RENDERERS, NO_DATA_RENDERERS,
-                                        MALFORMED_CATEGORY_LABEL, SNAPPED_TOOLBAR_ANNOTATIONS)
+from ..core.validation.errors import REQUIRED_RANGE, REQUIRED_SCALE, INCOMPATIBLE_SCALE_AND_RANGE
+from ..core.validation.warnings import MISSING_RENDERERS, NO_DATA_RENDERERS, SNAPPED_TOOLBAR_ANNOTATIONS
+from ..util.deprecation import deprecated
 from ..util.plot_utils import _list_attr_splat, _select_helper
 from ..util.string import nice_join
 
@@ -21,10 +19,15 @@ from .axes import Axis
 from .glyphs import Glyph
 from .grids import Grid
 from .layouts import LayoutDOM
-from .ranges import Range, FactorRange
+from .ranges import Range, FactorRange, DataRange1d, Range1d
 from .renderers import DataRenderer, DynamicImageRenderer, GlyphRenderer, Renderer, TileRenderer
+from .scales import Scale, CategoricalScale, LinearScale, LogScale
 from .sources import DataSource, ColumnDataSource
-from .tools import Tool, Toolbar, ToolEvents
+from .tools import Tool, Toolbar
+
+def _check_conflicting_kwargs(a1, a2, kwargs):
+    if a1 in kwargs and a2 in kwargs:
+        raise ValueError("Conflicting properties set on plot: %r and %r" % (a1, a2))
 
 class Plot(LayoutDOM):
     ''' Model representing a plot, containing glyphs, guides, annotations.
@@ -32,19 +35,15 @@ class Plot(LayoutDOM):
     '''
 
     def __init__(self, **kwargs):
-        if "tool_events" not in kwargs:
-            kwargs["tool_events"] = ToolEvents()
+        '''
 
-        if "toolbar" in kwargs and "logo" in kwargs:
-            raise ValueError("Conflicing properties set on plot: toolbar, logo.")
-
-        if "toolbar" in kwargs and "tools" in kwargs:
-            raise ValueError("Conflicing properties set on plot: toolbar, tools.")
+        '''
+        _check_conflicting_kwargs("toolbar", "tools", kwargs)
+        _check_conflicting_kwargs("toolbar", "logo", kwargs)
 
         if "toolbar" not in kwargs:
             tools = kwargs.pop('tools', [])
             logo = kwargs.pop('logo', 'normal')
-
             kwargs["toolbar"] = Toolbar(tools=tools, logo=logo)
 
         super(LayoutDOM, self).__init__(**kwargs)
@@ -235,15 +234,13 @@ class Plot(LayoutDOM):
             None
 
         '''
-        if not all(isinstance(tool, Tool) for tool in tools):
-            raise ValueError("All arguments to add_tool must be Tool subclasses.")
-
         for tool in tools:
-            if tool.plot is not None:
-                raise ValueError("tool %s to be added already has 'plot' attribute set" % tool)
-            tool.plot = self
+            if not isinstance(tool, Tool):
+                raise ValueError("All arguments to add_tool must be Tool subclasses.")
+
             if hasattr(tool, 'overlay'):
                 self.renderers.append(tool.overlay)
+
             self.toolbar.tools.append(tool)
 
     def add_glyph(self, source_or_glyph, glyph=None, **kw):
@@ -310,6 +307,7 @@ class Plot(LayoutDOM):
             DynamicImageRenderer : DynamicImageRenderer
 
         '''
+        deprecated((0, 12, 7), "add_dynamic_image", "GeoViews for GIS functions on top of Bokeh (http://geo.holoviews.org)")
         image_renderer = DynamicImageRenderer(image_source=image_source, **kw)
         self.renderers.append(image_renderer)
         return image_renderer
@@ -322,6 +320,43 @@ class Plot(LayoutDOM):
         if missing:
             return ", ".join(missing) + " [%s]" % self
 
+    @error(REQUIRED_SCALE)
+    def _check_required_scale(self):
+        missing = []
+        if not self.x_scale: missing.append('x_scale')
+        if not self.y_scale: missing.append('y_scale')
+        if missing:
+            return ", ".join(missing) + " [%s]" % self
+
+    @error(INCOMPATIBLE_SCALE_AND_RANGE)
+    def _check_compatible_scale_and_ranges(self):
+        incompatible = []
+        x_ranges = list(self.extra_x_ranges.values())
+        if self.x_range: x_ranges.append(self.x_range)
+        y_ranges = list(self.extra_y_ranges.values())
+        if self.y_range: y_ranges.append(self.y_range)
+
+        for rng in x_ranges:
+            if isinstance(rng, (DataRange1d, Range1d)) and not isinstance(self.x_scale, (LinearScale, LogScale)):
+                incompatible.append("incompatibility on x-dimension: %s, %s" %(rng, self.x_scale))
+            elif isinstance(rng, FactorRange) and not isinstance(self.x_scale, CategoricalScale):
+                incompatible.append("incompatibility on x-dimension: %s/%s" %(rng, self.x_scale))
+            # special case because CategoricalScale is a subclass of LinearScale, should be removed in future
+            if isinstance(rng, (DataRange1d, Range1d)) and isinstance(self.x_scale, CategoricalScale):
+                incompatible.append("incompatibility on x-dimension: %s, %s" %(rng, self.x_scale))
+
+        for rng in y_ranges:
+            if isinstance(rng, (DataRange1d, Range1d)) and not isinstance(self.y_scale, (LinearScale, LogScale)):
+                incompatible.append("incompatibility on y-dimension: %s/%s" %(rng, self.y_scale))
+            elif isinstance(rng, FactorRange) and not isinstance(self.y_scale, CategoricalScale):
+                incompatible.append("incompatibility on y-dimension: %s/%s" %(rng, self.y_scale))
+            # special case because CategoricalScale is a subclass of LinearScale, should be removed in future
+            if isinstance(rng, (DataRange1d, Range1d)) and isinstance(self.y_scale, CategoricalScale):
+                incompatible.append("incompatibility on y-dimension: %s, %s" %(rng, self.y_scale))
+
+        if incompatible:
+            return ", ".join(incompatible) + " [%s]" % self
+
     @warning(MISSING_RENDERERS)
     def _check_missing_renderers(self):
         if len(self.renderers) == 0:
@@ -331,28 +366,6 @@ class Plot(LayoutDOM):
     def _check_no_data_renderers(self):
         if len(self.select(DataRenderer)) == 0:
             return str(self)
-
-    @warning(MALFORMED_CATEGORY_LABEL)
-    def _check_colon_in_category_label(self):
-        if not self.x_range: return
-        if not self.y_range: return
-
-        broken = []
-
-        for range_name in ['x_range', 'y_range']:
-            category_range = getattr(self, range_name)
-            if not isinstance(category_range, FactorRange): continue
-
-            for value in category_range.factors:
-                if not isinstance(value, string_types): break
-                if ':' in value:
-                    broken.append((range_name, value))
-                    break
-
-        if broken:
-            field_msg = ' '.join('[range:%s] [first_value: %s]' % (field, value)
-                                 for field, value in broken)
-            return '%s [renderer: %s]' % (field_msg, self)
 
     @warning(SNAPPED_TOOLBAR_ANNOTATIONS)
     def _check_snapped_toolbar_and_axis(self):
@@ -371,22 +384,25 @@ class Plot(LayoutDOM):
     The (default) data range of the vertical dimension of the plot.
     """)
 
-    x_mapper_type = Either(Auto, String, help="""
-    What kind of mapper to use to convert x-coordinates in data space
-    into x-coordinates in screen space.
+    @classmethod
+    def _scale(cls, scale):
+        if scale in ["auto", "linear"]:
+            return LinearScale()
+        elif scale == "log":
+            return LogScale()
+        if scale == "categorical":
+            return CategoricalScale()
+        else:
+            raise ValueError("Unknown mapper_type: %s" % scale)
 
-    Typically this can be determined automatically, but this property
-    can be useful to, e.g., show datetime values as floating point
-    "seconds since epoch" instead of formatted dates.
+    x_scale = Instance(Scale, default=lambda: LinearScale(), help="""
+    What kind of scale to use to convert x-coordinates in data space
+    into x-coordinates in screen space.
     """)
 
-    y_mapper_type = Either(Auto, String, help="""
-    What kind of mapper to use to convert y-coordinates in data space
+    y_scale = Instance(Scale, default=lambda: LinearScale(), help="""
+    What kind of scale to use to convert y-coordinates in data space
     into y-coordinates in screen space.
-
-    Typically this can be determined automatically, but this property
-    can be useful to, e.g., show datetime values as floating point
-    "seconds since epoch" instead of formatted dates
     """)
 
     extra_x_ranges = Dict(String, Instance(Range), help="""
@@ -443,10 +459,6 @@ class Plot(LayoutDOM):
     toolbar_sticky = Bool(default=True, help="""
     Stick the toolbar to the edge of the plot. Default: True. If False,
     the toolbar will be outside of the axes, titles etc.
-    """)
-
-    tool_events = Instance(ToolEvents, help="""
-    A ToolEvents object to share and report tool events.
     """)
 
     left = List(Instance(Renderer), help="""
@@ -619,7 +631,42 @@ class Plot(LayoutDOM):
     level-of-detail mode is disabled.
     """)
 
-    webgl = Bool(False, help="""
-    Whether WebGL is enabled for this plot. If True, the glyphs that
-    support this will render via WebGL instead of the 2D canvas.
+    output_backend = Enum(OutputBackend, default="canvas", help="""
+    Specify the output backend for the plot area. Default is HTML5 Canvas.
+
+    .. note::
+        When set to ``webgl``, glyphs without a WebGL rendering implementation
+        will fall back to rendering onto 2D canvas.
+    """)
+
+    match_aspect = Bool(default=False, help="""
+    Specify the aspect ratio behavior of the plot. Aspect ratio is defined as
+    the ratio of width over height. This property controls whether Bokeh should
+    attempt the match the (width/height) of *data space* to the (width/height)
+    in pixels of *screen space*.
+
+    Default is ``False`` which indicates that the *data* aspect ratio and the
+    *screen* aspect ratio vary independently. ``True`` indicates that the plot
+    aspect ratio of the axes will match the aspect ratio of the pixel extent
+    the axes. The end result is that a 1x1 area in data space is a square in
+    pixels, and conversely that a 1x1 pixel is a square in data units.
+
+    .. note::
+        This setting only takes effect when there are two dataranges. This
+        setting only sets the initial plot draw and subsequent resets. It is
+        possible for tools (single axis zoom, unconstrained box zoom) to
+        change the aspect ratio.
+    """)
+
+    aspect_scale = Float(default=1, help="""
+    A value to be given for increased aspect ratio control. This value is added
+    multiplicatively to the calculated value required for ``match_aspect``.
+    ``aspect_scale`` is defined as the ratio of width over height of the figure.
+
+    For example, a plot with ``aspect_scale`` value of 2 will result in a
+    square in *data units* to be drawn on the screen as a rectangle with a
+    pixel width twice as long as its pixel height.
+
+    .. note::
+        This setting only takes effect if ``match_aspect`` is set to ``True``.
     """)

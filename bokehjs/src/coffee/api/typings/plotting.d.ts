@@ -16,7 +16,6 @@ declare namespace Bokeh.Plotting {
     "pan" | "xpan" | "ypan" |
     "wheel_zoom" | "xwheel_zoom" | "ywheel_zoom" |
     "save" |
-    "resize" |
     "click" | "tap" |
     "crosshair" |
     "box_select" | "xbox_select" | "ybox_select" |
@@ -213,6 +212,11 @@ declare namespace Bokeh.Plotting {
       x1: DataAttr,
       y1: DataAttr,
       opts?: SegmentOpts):          GlyphRenderer;
+    step(
+      x: DataAttr,
+      y: DataAttr,
+      mode: StepType,
+      opts?: LineOpts):             GlyphRenderer;
     text(
       x: DataAttr,
       y: DataAttr,

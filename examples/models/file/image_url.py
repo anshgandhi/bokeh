@@ -7,7 +7,7 @@ from bokeh.models.glyphs import ImageURL
 from bokeh.models import ColumnDataSource, Range1d, Plot, LinearAxis, Grid
 from bokeh.resources import INLINE
 
-url = "http://bokeh.pydata.org/en/latest/_static/images/logo.png"
+url = "https://bokeh.pydata.org/en/latest/_static/images/logo.png"
 N = 5
 
 source = ColumnDataSource(dict(
@@ -34,7 +34,7 @@ image2 = ImageURL(url="url", x="x2", y="y2", w=20, h=20, anchor="top_left")
 plot.add_glyph(source, image2)
 
 image3 = ImageURL(url=dict(value=url), x=200, y=-100, anchor="bottom_right")
-plot.add_glyph(source, image3)
+plot.add_glyph(image3)
 
 xaxis = LinearAxis()
 plot.add_layout(xaxis, 'below')

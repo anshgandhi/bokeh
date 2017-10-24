@@ -169,10 +169,6 @@ that is SSL-terminated.
     It is not advised to set this option on a Bokeh server directly facing
     the Internet.
 
-
-
-.. _userguide_cli_serve_session_id_options:
-
 Session ID Options
 ~~~~~~~~~~~~~~~~~~
 
@@ -294,9 +290,8 @@ import warnings
 
 from bokeh.application import Application
 from bokeh.resources import DEFAULT_SERVER_PORT
-from bokeh.server.server import Server
 from bokeh.util.logconfig import basicConfig
-from bokeh.util.string import nice_join
+from bokeh.util.string import nice_join, format_docstring
 from bokeh.settings import settings
 
 from os import getpid
@@ -304,11 +299,11 @@ from os import getpid
 from ..subcommand import Subcommand
 from ..util import build_single_handler_applications, die, report_server_init_errors
 
-LOGLEVELS = ('debug', 'info', 'warning', 'error', 'critical')
+LOGLEVELS = ('trace', 'debug', 'info', 'warning', 'error', 'critical')
 SESSION_ID_MODES = ('unsigned', 'signed', 'external-signed')
 DEFAULT_LOG_FORMAT = "%(asctime)s %(message)s"
 
-__doc__ = __doc__.format(
+__doc__ = format_docstring(__doc__,
     DEFAULT_PORT=DEFAULT_SERVER_PORT,
     LOGLEVELS=nice_join(LOGLEVELS),
     SESSION_ID_MODES=nice_join(SESSION_ID_MODES),
@@ -365,9 +360,11 @@ class Serve(Subcommand):
 
     '''
 
+    #: name for this subcommand
     name = "serve"
 
     help = "Run a Bokeh server hosting one or more applications"
+
     args = base_serve_args + (
         ('files', dict(
             metavar='DIRECTORY-OR-SCRIPT',
@@ -471,6 +468,14 @@ class Serve(Subcommand):
 
 
     def invoke(self, args):
+        '''
+
+        '''
+
+        # protect this import inside a function so that "bokeh info" can work
+        # even if Tornado is not installed
+        from bokeh.server.server import Server
+
         argvs = { f : args.args for f in args.files}
         applications = build_single_handler_applications(args.files, argvs)
 
@@ -554,14 +559,13 @@ class Serve(Subcommand):
                         server.show(route)
                 server.io_loop.add_callback(show_callback)
 
-            address_string = ''
+            address_string = 'localhost'
             if server.address is not None and server.address != '':
-                address_string = ' address ' + server.address
+                address_string = server.address
 
-            log.info("Starting Bokeh server on port %d%s with applications at paths %r",
-                     server.port,
-                     address_string,
-                     sorted(applications.keys()))
+            for route in sorted(applications.keys()):
+                url = "http://%s:%d%s%s" % (address_string, server.port, server.prefix, route)
+                log.info("Bokeh app running at: %s" % url)
 
             log.info("Starting Bokeh server with process id: %d" % getpid())
             server.run_until_shutdown()

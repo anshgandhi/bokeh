@@ -11,9 +11,7 @@ from ..core.has_props import abstract
 from ..core.properties import Bool, Enum, Int, Instance, List, Seq, String
 from ..core.validation import warning
 from ..core.validation.warnings import BOTH_CHILD_AND_ROOT, EMPTY_LAYOUT
-from ..embed import notebook_div
 from ..model import Model
-from ..util.deprecation import deprecated
 
 @abstract
 class LayoutDOM(Model):
@@ -64,11 +62,6 @@ class LayoutDOM(Model):
     A list of css class names to add to this DOM element. Note: the class names are
     simply added as-is, no other guarantees are provided.
     """)
-
-    @property
-    def html(self):
-        from IPython.core.display import HTML
-        return HTML(notebook_div(self))
 
 
 class Spacer(LayoutDOM):
@@ -192,27 +185,3 @@ class Column(Box):
     Children can be specified as positional arguments, as a single argument
     that is a sequence, or using the ``children`` keyword argument.
     '''
-
-
-def HBox(*args, **kwargs):
-    ''' Lay out child components in a single horizontal row.
-
-    Children can be specified as positional arguments, as a single argument
-    that is a sequence, or using the ``children`` keyword argument.
-
-    Returns a Row instance.
-    '''
-    deprecated((0, 12, 5), 'bokeh.models.HBox', 'bokeh.models.Row')
-    return Row(*args, **kwargs)
-
-
-def VBox(*args, **kwargs):
-    ''' Lay out child components in a single vertical row.
-
-    Children can be specified as positional arguments, as a single argument
-    that is a sequence, or using the ``children`` keyword argument.
-
-    Returns a Column instance.
-    '''
-    deprecated((0, 12, 5), 'bokeh.models.VBox', 'bokeh.models.Column')
-    return Column(*args, **kwargs)

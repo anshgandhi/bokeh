@@ -1,14 +1,15 @@
 import * as p from "core/properties"
 import * as bbox from "core/util/bbox"
 import * as proj from "core/util/projections"
-import {BokehView} from "core/bokeh_view"
+import {View} from "core/view"
 import {Model} from "../../model"
 import {Visuals} from "core/visuals"
 import {logger} from "core/logging"
 import {extend} from "core/util/object"
-import {isString, isArray} from "core/util/types"
+import {isArray} from "core/util/types"
+import {LineView} from "./line"
 
-export class GlyphView extends BokehView
+export class GlyphView extends View
 
   initialize: (options) ->
     super(options)
@@ -24,7 +25,7 @@ export class GlyphView extends BokehView
 
     if ctx.glcanvas?
       try
-        glglyphs = require("models/glyphs/webgl/index")
+        glglyphs = require("./webgl/index")
       catch e
         if e.code == 'MODULE_NOT_FOUND'
           logger.warn('WebGL was requested and is supported, but bokeh-gl(.min).js is not available, falling back to 2D rendering.')
@@ -51,6 +52,11 @@ export class GlyphView extends BokehView
         return
 
     @_render(ctx, indices, data)
+
+  has_finished: () -> true
+
+  notify_finished: () ->
+    @renderer.notify_finished()
 
   bounds: () ->
     if not @index?
@@ -97,9 +103,9 @@ export class GlyphView extends BokehView
   scx: (i) -> return @sx[i]
   scy: (i) -> return @sy[i]
 
-  sdist: (mapper, pts, spans, pts_location="edge", dilate=false) ->
-    if isString(pts[0])
-      pts = mapper.v_map_to_target(pts)
+  sdist: (scale, pts, spans, pts_location="edge", dilate=false) ->
+    if scale.source_range.v_synthetic?
+      pts = scale.source_range.v_synthetic(pts)
 
     if pts_location == 'center'
       halfspan = (d / 2 for d in spans)
@@ -109,8 +115,8 @@ export class GlyphView extends BokehView
       pt0 = pts
       pt1 = (pt0[i] + spans[i] for i in [0...pt0.length])
 
-    spt0 = mapper.v_map_to_target(pt0)
-    spt1 = mapper.v_map_to_target(pt1)
+    spt0 = scale.v_compute(pt0)
+    spt1 = scale.v_compute(pt1)
 
     if dilate
       return (Math.ceil(Math.abs(spt1[i] - spt0[i])) for i in [0...spt0.length])
@@ -165,8 +171,19 @@ export class GlyphView extends BokehView
 
     return result
 
-  set_data: (source) ->
+  set_data: (source, indices, indices_to_update) ->
     data = @model.materialize_dataspecs(source)
+
+    @visuals.set_all_indices(indices)
+    if indices and not (@ instanceof LineView)
+      data_subset = {}
+      for k, v of data
+        if k.charAt(0) == '_'
+          data_subset[k] = (v[i] for i in indices)
+        else
+          data_subset[k] = v
+      data = data_subset
+
     extend(@, data)
 
     if @renderer.plot_view.model.use_map
@@ -175,10 +192,23 @@ export class GlyphView extends BokehView
       if @_xs?
         [@_xs, @_ys] = proj.project_xsys(@_xs, @_ys)
 
+    # if we have any coordinates that are categorical, convert them to
+    # synthetic coords here
+    if @renderer.plot_view.frame.x_ranges?   # XXXX JUST TEMP FOR TESTS TO PASS
+      xr = @renderer.plot_view.frame.x_ranges[@model.x_range_name]
+      yr = @renderer.plot_view.frame.y_ranges[@model.y_range_name]
+      for [xname, yname] in @model._coords
+        xname = "_#{xname}"
+        yname = "_#{yname}"
+        if xr.v_synthetic?
+          @[xname] = xr.v_synthetic(@[xname])
+        if yr.v_synthetic?
+          @[yname] = yr.v_synthetic(@[yname])
+
     if @glglyph?
       @glglyph.set_data_changed(@_x.length)
 
-    @_set_data(source)
+    @_set_data(source, indices_to_update) #TODO doesn't take subset indices into account
 
     @index = @_index_data()
 

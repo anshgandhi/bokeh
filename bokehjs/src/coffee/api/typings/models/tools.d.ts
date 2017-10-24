@@ -1,10 +1,4 @@
 declare namespace Bokeh {
-  export var ToolEvents: { new(attributes?: IToolEvents, options?: ModelOpts): ToolEvents };
-  export interface ToolEvents extends Model, IToolEvents {}
-  export interface IToolEvents extends IModel {
-    geometries?: Array<any>;
-  }
-
   export interface Tool extends Model, ITool {}
   export interface ITool extends IModel, IBackRef {}
 
@@ -70,10 +64,6 @@ declare namespace Bokeh {
   export interface IResetTool extends ITool {
     reset_size?: Boolean;
   }
-
-  export var ResizeTool: { new(attributes?: IResizeTool, options?: ModelOpts): ResizeTool };
-  export interface ResizeTool extends Tool, IResizeTool {}
-  export interface IResizeTool extends ITool {}
 
   export var CrosshairTool: { new(attributes?: ICrosshairTool, options?: ModelOpts): CrosshairTool };
   export interface CrosshairTool extends InspectTool, ICrosshairTool {}

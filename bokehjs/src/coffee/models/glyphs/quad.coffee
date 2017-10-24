@@ -1,60 +1,6 @@
-import {RBush} from "core/util/spatial"
-import {Glyph, GlyphView} from "./glyph"
-import {CategoricalMapper} from "../mappers/categorical_mapper"
-import * as hittest from "core/hittest"
+import {Box, BoxView} from "./box"
 
-export class QuadView extends GlyphView
-
-  _index_data: () ->
-    map_to_synthetic = (mapper, array) ->
-      if mapper instanceof CategoricalMapper
-        mapper.v_map_to_target(array, true)
-      else
-        array
-
-    left = map_to_synthetic(@renderer.xmapper, @_left)
-    right = map_to_synthetic(@renderer.xmapper, @_right)
-
-    top = map_to_synthetic(@renderer.ymapper, @_top)
-    bottom = map_to_synthetic(@renderer.ymapper, @_bottom)
-
-    points = []
-    for i in [0...left.length]
-      l = left[i]
-      r = right[i]
-      t = top[i]
-      b = bottom[i]
-      if isNaN(l+r+t+b) or not isFinite(l+r+t+b)
-        continue
-      points.push({minX: l, minY: b, maxX: r, maxY: t, i: i})
-
-    return new RBush(points)
-
-  _render: (ctx, indices, {sleft, sright, stop, sbottom}) ->
-    for i in indices
-      if isNaN(sleft[i]+stop[i]+sright[i]+sbottom[i])
-        continue
-
-      if @visuals.fill.doit
-        @visuals.fill.set_vectorize(ctx, i)
-        ctx.fillRect(sleft[i], stop[i], sright[i]-sleft[i], sbottom[i]-stop[i])
-
-      if @visuals.line.doit
-        ctx.beginPath()
-        ctx.rect(sleft[i], stop[i], sright[i]-sleft[i], sbottom[i]-stop[i])
-        @visuals.line.set_vectorize(ctx, i)
-        ctx.stroke()
-
-  _hit_point: (geometry) ->
-    [vx, vy] = [geometry.vx, geometry.vy]
-    x = @renderer.xmapper.map_from_target(vx, true)
-    y = @renderer.ymapper.map_from_target(vy, true)
-
-    hits = @index.indices({minX: x, minY: y, maxX: x, maxY: y})
-
-    result = hittest.create_hit_test_result()
-    result['1d'].indices = hits
-    return result
+export class QuadView extends BoxView
 
   get_anchor_point: (anchor, i, spt) ->
     left = Math.min(@sleft[i], @sright[i])
@@ -79,13 +25,18 @@ export class QuadView extends GlyphView
   scy: (i) ->
     return (@stop[i] + @sbottom[i])/2
 
-  draw_legend_for_index: (ctx, x0, x1, y0, y1, index) ->
-    @_generic_area_legend(ctx, x0, x1, y0, y1, index)
+  _index_data: () ->
+    return @_index_box(@_right.length)
 
-export class Quad extends Glyph
+  _lrtb: (i) ->
+    l = @_left[i]
+    r = @_right[i]
+    t = @_top[i]
+    b = @_bottom[i]
+    return [l, r, t, b]
+
+export class Quad extends Box
   default_view: QuadView
-
   type: 'Quad'
 
   @coords [['right', 'bottom'], ['left', 'top']]
-  @mixins ['line', 'fill']

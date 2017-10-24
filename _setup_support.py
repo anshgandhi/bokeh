@@ -149,6 +149,10 @@ def build_or_install_bokehjs():
         install_js()
         return "installed"
 
+def conda_rendering():
+    return os.getenv("CONDA_BUILD_STATE" ,"junk") == "RENDER"
+
+
 def fixup_building_sdist():
     ''' Check for 'sdist' and ensure we always build BokehJS when packaging
 
@@ -191,30 +195,6 @@ def fixup_for_packaged():
                 sys.argv.remove('--install-js')
         if "--existing-js" not in sys.argv:
             sys.argv.append('--existing-js')
-
-def fixup_old_jsargs():
-    ''' Fixup (and warn about) old style command line options with underscores.
-
-    This function modifies ``sys.argv`` to make the replacements:
-
-    * ``--build_js`` to --build-js
-    * ``--install_js`` to --install-js
-
-    and prints a warning about their deprecation.
-
-    Returns:
-        None
-
-    '''
-    for i in range(len(sys.argv)):
-
-        if sys.argv[i] == '--build_js':
-            print("WARNING: --build_js (with underscore) is deprecated, use --build-js")
-            sys.argv[i] = '--build-js'
-
-        if sys.argv[i] == '--install_js':
-            print("WARNING: --install_js (with underscore) is deprecated, use --install-js")
-            sys.argv[i] = '--install-js'
 
 # Horrible hack: workaround to allow creation of bdist_wheel on pip
 # installation. Why, for God's sake, is pip forcing the generation of wheels
@@ -348,6 +328,11 @@ def build_js():
         print("  - bokeh-widgets.min.js  : %6.1f KB" % size("js", "bokeh-widgets.min.js"))
         print("  - bokeh-widgets.min.css : %6.1f KB" % size("css", "bokeh-widgets.min.css"))
 
+        print("  - bokeh-tables.js       : %6.1f KB" % size("js", "bokeh-tables.js"))
+        print("  - bokeh-tables.css      : %6.1f KB" % size("css", "bokeh-tables.css"))
+        print("  - bokeh-tables.min.js   : %6.1f KB" % size("js", "bokeh-tables.min.js"))
+        print("  - bokeh-tables.min.css  : %6.1f KB" % size("css", "bokeh-tables.min.css"))
+
         print("  - bokeh-api.js          : %6.1f KB" % size("js", "bokeh-api.js"))
         print("  - bokeh-api.min.js      : %6.1f KB" % size("js", "bokeh-api.min.js"))
     except Exception as e:
@@ -426,7 +411,7 @@ ERROR: Cannot install BokehJS: files missing in `./bokehjs/build`.
 
 
 Please build BokehJS by running setup.py with the `--build-js` option.
-  Dev Guide: http://bokeh.pydata.org/docs/dev_guide.html#bokehjs.
+  Dev Guide: https://bokeh.pydata.org/docs/dev_guide.html#bokehjs.
 """
 
 BUILD_EXEC_FAIL_MSG = bright(red("Failed.")) + """
@@ -438,7 +423,7 @@ ERROR: subprocess.Popen(%r) failed to execute:
 Have you run `npm install` from the bokehjs subdirectory?
 For more information, see the Dev Guide:
 
-    http://bokeh.pydata.org/en/latest/docs/dev_guide.html
+    https://bokeh.pydata.org/en/latest/docs/dev_guide.html
 """
 
 BUILD_FAIL_MSG = bright(red("Failed.")) + """

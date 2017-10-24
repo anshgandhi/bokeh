@@ -4,9 +4,9 @@ labels on Bokeh plot axes.
 '''
 from __future__ import absolute_import
 
-import inspect
 from types import FunctionType
 
+from bokeh.util.string import format_docstring
 from ..core.enums import LatLon, NumeralLanguage, RoundingFunction
 from ..core.has_props import abstract
 from ..core.properties import Auto, Bool, Dict, Either, Enum, Instance, Int, List, String
@@ -15,8 +15,7 @@ from ..core.validation.errors import MISSING_MERCATOR_DIMENSION
 from ..model import Model
 from ..util.compiler import nodejs_compile, CompilationError
 from ..util.dependencies import import_required
-from ..util.deprecation import deprecated
-
+from ..util.future import get_param_info, signature
 from .tickers import Ticker
 
 @abstract
@@ -271,22 +270,21 @@ class FuncTickFormatter(TickFormatter):
         pyscript = import_required('flexx.pyscript',
                                    'To use Python functions for CustomJS, you need Flexx ' +
                                    '("conda install -c bokeh flexx" or "pip install flexx")')
-        argspec = inspect.getargspec(func)
+        sig = signature(func)
 
-        default_names = argspec.args
-        default_values = argspec.defaults or []
+        all_names, default_values = get_param_info(sig)
 
-        if len(default_names) - len(default_values) != 0:
+        if len(all_names) - len(default_values) != 0:
             raise ValueError("Function `func` may only contain keyword arguments.")
 
         if default_values and not any([isinstance(value, Model) for value in default_values]):
-            raise ValueError("Default value must be a plot object.")
+            raise ValueError("Default value must be a Bokeh Model.")
 
-        func_kwargs = dict(zip(default_names, default_values))
+        func_kwargs = dict(zip(all_names, default_values))
 
         # Wrap the code attr in a function named `formatter` and call it
         # with arguments that match the `args` attr
-        code = pyscript.py2js(func, 'formatter') + 'return formatter(%s);\n' % ', '.join(default_names)
+        code = pyscript.py2js(func, 'formatter') + 'return formatter(%s);\n' % ', '.join(all_names)
 
         return cls(code=code, args=func_kwargs)
 
@@ -330,21 +328,6 @@ class FuncTickFormatter(TickFormatter):
             return Math.floor(tick) + " + " + (tick % 1).toFixed(2)
             '''
     """)
-
-def DEFAULT_DATETIME_FORMATS():
-    deprecated((0, 12, 3), 'DEFAULT_DATETIME_FORMATS', 'individual DatetimeTickFormatter fields')
-    return {
-        'microseconds': ['%fus'],
-        'milliseconds': ['%3Nms', '%S.%3Ns'],
-        'seconds':      ['%Ss'],
-        'minsec':       [':%M:%S'],
-        'minutes':      [':%M', '%Mm'],
-        'hourmin':      ['%H:%M'],
-        'hours':        ['%Hh', '%H:%M'],
-        'days':         ['%m/%d', '%a%d'],
-        'months':       ['%m/%Y', '%b%y'],
-        'years':        ['%Y'],
-    }
 
 def _DATETIME_TICK_FORMATTER_HELP(field):
     return """
@@ -597,46 +580,11 @@ class DatetimeTickFormatter(TickFormatter):
                         help=_DATETIME_TICK_FORMATTER_HELP("``years``"),
                         default=['%Y']).accepts(String, lambda fmt: [fmt])
 
-    __deprecated_attributes__ = ('formats',)
-
-    @property
-    def formats(self):
-        ''' A dictionary containing formats for all scales.
-
-        THIS PROPERTY IS DEPRECTATED. Use individual DatetimeTickFormatter fields instead.
-
-        '''
-        deprecated((0, 12, 3), 'DatetimeTickFormatter.formats', 'individual DatetimeTickFormatter fields')
-        return dict(
-            microseconds = self.microseconds,
-            milliseconds = self.milliseconds,
-            seconds      = self.seconds,
-            minsec       = self.minsec,
-            minutes      = self.minutes,
-            hourmin      = self.hourmin,
-            hours        = self.hours,
-            days         = self.days,
-            months       = self.months,
-            years        = self.years)
-
-    @formats.setter
-    def formats(self, value):
-        deprecated((0, 12, 3), 'DatetimeTickFormatter.formats', 'individual DatetimeTickFormatter fields')
-        if 'microseconds' in value: self.microseconds = value['microseconds']
-        if 'milliseconds' in value: self.milliseconds = value['milliseconds']
-        if 'seconds'      in value: self.seconds      = value['seconds']
-        if 'minsec'       in value: self.minsec       = value['minsec']
-        if 'minutes'      in value: self.minutes      = value['minutes']
-        if 'hourmin'      in value: self.hourmin      = value['hourmin']
-        if 'hours'        in value: self.hours        = value['hours']
-        if 'days'         in value: self.days         = value['days']
-        if 'months'       in value: self.months       = value['months']
-        if 'years'        in value: self.years        = value['years']
-
 # This is to automate documentation of DatetimeTickFormatter formats and their defaults
 _df = DatetimeTickFormatter()
 _df_fields = ['microseconds', 'milliseconds', 'seconds', 'minsec', 'minutes', 'hourmin', 'hours', 'days', 'months', 'years']
 _df_defaults = _df.properties_with_values()
 _df_defaults_string = "\n\n        ".join("%s = %s" % (name, _df_defaults[name]) for name in _df_fields)
-DatetimeTickFormatter.__doc__ = DatetimeTickFormatter.__doc__.format(defaults=_df_defaults_string)
+
+DatetimeTickFormatter.__doc__ = format_docstring(DatetimeTickFormatter.__doc__, defaults=_df_defaults_string)
 del _df, _df_fields, _df_defaults, _df_defaults_string

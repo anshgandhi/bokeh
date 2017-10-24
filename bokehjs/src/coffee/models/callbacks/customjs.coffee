@@ -6,9 +6,9 @@ export class CustomJS extends Model
   type: 'CustomJS'
 
   @define {
-      args: [ p.Any,     {}           ] # TODO (bev) better type
-      code: [ p.String,  ''           ]
-    }
+    args: [ p.Any,     {} ] # TODO (bev) better type
+    code: [ p.String,  '' ]
+  }
 
   @getters {
     values: () -> @_make_values()
@@ -16,7 +16,7 @@ export class CustomJS extends Model
   }
 
   execute: (cb_obj, cb_data) ->
-    @func(@values..., cb_obj, cb_data, require, {})
+    @func.apply(cb_obj, @values.concat(cb_obj, cb_data, require, {}))
 
   _make_values: () -> values(@args)
 

@@ -63,17 +63,17 @@ easily and automatically extracted with the Sphinx extensions in the
 Basic Properties
 ----------------
 
-%s
+{basic_properties}
 
 Container Properties
 --------------------
 
-%s
+{container_properties}
 
 DataSpec Properties
 -------------------
 
-%s
+{dataspec_properties}
 
 Helpers
 ~~~~~~~
@@ -104,14 +104,16 @@ import re
 
 from six import string_types, iteritems
 
-from ..colors import RGB
+from .. import colors
 from ..util.dependencies import import_optional
-from ..util.serialization import transform_column_source_data, decode_base64_dict
-from ..util.string import nice_join
+from ..util.serialization import convert_datetime_type, decode_base64_dict, transform_column_source_data
+from ..util.string import nice_join, format_docstring
 
 from .property.bases import ContainerProperty, DeserializationError, ParameterizedProperty, Property, PrimitiveProperty
+from .property.containers import PropertyValueColumnData, PropertyValueDict, PropertyValueList
 from .property.descriptor_factory import PropertyDescriptorFactory
-from .property.descriptors import BasicPropertyDescriptor, DataSpecPropertyDescriptor, UnitsSpecPropertyDescriptor
+from .property.descriptors import (BasicPropertyDescriptor, ColumnDataPropertyDescriptor, DataSpecPropertyDescriptor,
+                                   UnitsSpecPropertyDescriptor)
 from . import enums
 
 pd = import_optional('pandas')
@@ -309,6 +311,19 @@ class String(PrimitiveProperty):
 
     '''
     _underlying_type = string_types
+
+class FontSize(String):
+
+    _font_size_re = re.compile(r"^[0-9]+(.[0-9]+)?(%|em|ex|ch|ic|rem|vw|vh|vi|vb|vmin|vmax|cm|mm|q|in|pc|pt|px)$", re.I)
+
+    def validate(self, value):
+        super(FontSize, self).validate(value)
+
+        if isinstance(value, string_types):
+            if len(value) == 0:
+                raise ValueError("empty string is not a valid font size value")
+            elif self._font_size_re.match(value) is None:
+                raise ValueError("%r is not a valid font size value" % value)
 
 class Regex(String):
     ''' Accept strings that match a given regular expression.
@@ -636,6 +651,9 @@ class Either(ParameterizedProperty):
             return self._type_params[0]._raw_default()
         default = kwargs.get("default", choose_default)
         super(Either, self).__init__(default=default, help=help)
+        self.alternatives = []
+        for tp in self._type_params:
+            self.alternatives.extend(tp.alternatives)
 
     # TODO (bev) get rid of this?
     def __or__(self, other):
@@ -758,6 +776,17 @@ class Auto(Enum):
     def _sphinx_type(self):
         return self._sphinx_prop_link()
 
+class RGB(Property):
+    ''' Accept Date (but not DateTime) values.
+
+    '''
+
+    def validate(self, value):
+        super(RGB, self).validate(value)
+
+        if not (value is None or isinstance(value, colors.RGB)):
+            raise ValueError("expected RGB value, got %r" % (value,))
+
 # Properties useful for defining visual attributes
 class Color(Either):
     ''' Accept color values in a variety of ways.
@@ -799,7 +828,8 @@ class Color(Either):
         types = (Enum(enums.NamedColor),
                  Regex("^#[0-9a-fA-F]{6}$"),
                  Tuple(Byte, Byte, Byte),
-                 Tuple(Byte, Byte, Byte, Percent))
+                 Tuple(Byte, Byte, Byte, Percent),
+                 RGB)
         super(Color, self).__init__(*types, default=default, help=help)
 
     def __str__(self):
@@ -807,7 +837,7 @@ class Color(Either):
 
     def transform(self, value):
         if isinstance(value, tuple):
-            value = RGB(*value).to_css()
+            value = colors.RGB(*value).to_css()
         return value
 
     def _sphinx_type(self):
@@ -1029,10 +1059,10 @@ class Angle(Float):
     pass
 
 class Date(Property):
-    ''' Accept Date (not datetime) values.
+    ''' Accept Date (but not DateTime) values.
 
     '''
-    def __init__(self, default=datetime.date.today(), help=None):
+    def __init__(self, default=None, help=None):
         super(Date, self).__init__(default=default, help=help)
 
     def transform(self, value):
@@ -1201,6 +1231,19 @@ class List(Seq):
         super(List, self).__init__(item_type, default=default, help=help)
 
     @classmethod
+    def wrap(cls, value):
+        ''' Some property types need to wrap their values in special containers, etc.
+
+        '''
+        if isinstance(value, list):
+            if isinstance(value, PropertyValueList):
+                return value
+            else:
+                return PropertyValueList(value)
+        else:
+            return value
+
+    @classmethod
     def _is_seq(cls, value):
         return isinstance(value, list)
 
@@ -1255,9 +1298,21 @@ class Dict(ContainerProperty):
                     all(self.keys_type.is_valid(key) and self.values_type.is_valid(val) for key, val in iteritems(value))):
                 raise ValueError("expected an element of %s, got %r" % (self, value))
 
+    @classmethod
+    def wrap(cls, value):
+        ''' Some property types need to wrap their values in special containers, etc.
+
+        '''
+        if isinstance(value, dict):
+            if isinstance(value, PropertyValueDict):
+                return value
+            else:
+                return PropertyValueDict(value)
+        else:
+            return value
+
     def _sphinx_type(self):
         return self._sphinx_prop_link() + "( %s, %s )" % (self.keys_type._sphinx_type(), self.values_type._sphinx_type())
-
 
 class ColumnData(Dict):
     ''' Accept a Python dictionary suitable as the ``data`` attribute of a
@@ -1267,6 +1322,23 @@ class ColumnData(Dict):
     encoding columns that are NumPy arrays.
 
     '''
+
+    def make_descriptors(self, base_name):
+        ''' Return a list of ``ColumnDataPropertyDescriptor`` instances to
+        install on a class, in order to delegate attribute access to this
+        property.
+
+        Args:
+            base_name (str) : the name of the property these descriptors are for
+
+        Returns:
+            list[ColumnDataPropertyDescriptor]
+
+        The descriptors returned are collected by the ``MetaHasProps``
+        metaclass and added to ``HasProps`` subclasses during class creation.
+        '''
+        return [ ColumnDataPropertyDescriptor(base_name, self) ]
+
 
     def from_json(self, json, models=None):
         ''' Decodes column source data encoded as lists or base64 strings.
@@ -1293,9 +1365,21 @@ class ColumnData(Dict):
                 new_data[key] = self.values_type.from_json(value, models)
         return new_data
 
-
     def serialize_value(self, value):
         return transform_column_source_data(value)
+
+    @classmethod
+    def wrap(cls, value):
+        ''' Some property types need to wrap their values in special containers, etc.
+
+        '''
+        if isinstance(value, dict):
+            if isinstance(value, PropertyValueColumnData):
+                return value
+            else:
+                return PropertyValueColumnData(value)
+        else:
+            return value
 
 class Tuple(ContainerProperty):
     ''' Accept Python tuple values.
@@ -1432,21 +1516,21 @@ class DataSpec(Either):
             color = ColorSpec(help="docs for color") # defaults to None
 
     '''
-    def __init__(self, typ, default, help=None):
+    def __init__(self, key_type, value_type, default, help=None):
         super(DataSpec, self).__init__(
             String,
             Dict(
-                String,
+                key_type,
                 Either(
                     String,
                     Instance('bokeh.models.transforms.Transform'),
-                    Instance('bokeh.models.mappers.ColorMapper'),
-                    typ)),
-            typ,
+                    Instance('bokeh.models.expressions.Expression'),
+                    value_type)),
+            value_type,
             default=default,
             help=help
         )
-        self._type = self._validate_type_param(typ)
+        self._type = self._validate_type_param(value_type)
 
     # TODO (bev) add stricter validation on keys
 
@@ -1456,7 +1540,7 @@ class DataSpec(Either):
         property.
 
         Args:
-            name (str) : the name of the property these descriptors are for
+            base_name (str) : the name of the property these descriptors are for
 
         Returns:
             list[DataSpecPropertyDescriptor]
@@ -1483,14 +1567,22 @@ class DataSpec(Either):
         if isinstance(val, string_types):
             return dict(field=val)
 
-        # Must be dict, return as-is
-        return val
+        # Must be dict, return a new dict
+        return dict(val)
 
     def _sphinx_type(self):
         return self._sphinx_prop_link()
 
+_ExprFieldValueTransform = Enum("expr", "field", "value", "transform")
+
 class NumberSpec(DataSpec):
-    ''' A |DataSpec| property that accepts numeric fixed values.
+    ''' A |DataSpec| property that accepts numeric and datetime fixed values.
+
+    By default, date and datetime values are immediately converted to
+    milliseconds since epoch. It it possible to disable processing of datetime
+    values by passing ``accept_datetime=False``.
+
+    Timedelta values are interpreted as absolute milliseconds.
 
     .. code-block:: python
 
@@ -1499,8 +1591,12 @@ class NumberSpec(DataSpec):
         m.location = "foo" # field
 
     '''
-    def __init__(self, default=None, help=None):
-        super(NumberSpec, self).__init__(Float, default=default, help=help)
+    def __init__(self, default=None, help=None, key_type=_ExprFieldValueTransform, accept_datetime=True):
+        super(NumberSpec, self).__init__(key_type, Float, default=default, help=help)
+        self.accepts(TimeDelta, convert_datetime_type)
+        if accept_datetime:
+            self.accepts(Datetime, convert_datetime_type)
+
 
 class StringSpec(DataSpec):
     ''' A |DataSpec| property that accepts string fixed values.
@@ -1517,8 +1613,8 @@ class StringSpec(DataSpec):
         m.title = "foo"        # field
 
     '''
-    def __init__(self, default, help=None):
-        super(StringSpec, self).__init__(List(String), default=default, help=help)
+    def __init__(self, default, help=None, key_type=_ExprFieldValueTransform):
+        super(StringSpec, self).__init__(key_type, List(String), default=default, help=help)
 
     def prepare_value(self, cls, name, value):
         if isinstance(value, list):
@@ -1547,15 +1643,19 @@ class FontSizeSpec(DataSpec):
     https://drafts.csswg.org/css-values/#lengths
 
     '''
-    _font_size_re = re.compile("^[0-9]+(\.[0-9]+)?(%|em|ex|ch|ic|rem|vw|vh|vi|vb|vmin|vmax|cm|mm|q|in|pc|pt|px)$", re.I)
 
-    def __init__(self, default, help=None):
-        super(FontSizeSpec, self).__init__(List(String), default=default, help=help)
+    def __init__(self, default, help=None, key_type=_ExprFieldValueTransform):
+        super(FontSizeSpec, self).__init__(key_type, FontSize, default=default, help=help)
 
-    def prepare_value(self, cls, name, value):
-        if isinstance(value, string_types) and self._font_size_re.match(value) is not None:
-            value = dict(value=value)
-        return super(FontSizeSpec, self).prepare_value(cls, name, value)
+    def validate(self, value):
+        # We want to preserve existing semantics and be a little more restrictive. This
+        # validations makes m.font_size = "" or m.font_size = "6" an error
+        super(FontSizeSpec, self).validate(value)
+        if isinstance(value, string_types):
+            if len(value) == 0 or value[0].isdigit() and FontSize._font_size_re.match(value) is None:
+                raise ValueError("%r is not a valid font size value" % value)
+
+_ExprFieldValueTransformUnits = Enum("expr", "field", "value", "transform", "units")
 
 class UnitsSpec(NumberSpec):
     ''' A |DataSpec| property that accepts numeric fixed values, and also
@@ -1563,7 +1663,7 @@ class UnitsSpec(NumberSpec):
 
     '''
     def __init__(self, default, units_type, units_default, help=None):
-        super(UnitsSpec, self).__init__(default=default, help=help)
+        super(UnitsSpec, self).__init__(default=default, help=help, key_type=_ExprFieldValueTransformUnits)
         self._units_type = self._validate_type_param(units_type)
         # this is a hack because we already constructed units_type
         self._units_type.validate(units_default)
@@ -1634,7 +1734,7 @@ class DistanceSpec(UnitsSpec):
             pass
         return super(DistanceSpec, self).prepare_value(cls, name, value)
 
-class ScreenDistanceSpec(NumberSpec):
+class ScreenDistanceSpec(UnitsSpec):
     ''' A |DataSpec| property that accepts numeric fixed values for screen
     distances, and also provides an associated units property that reports
     ``"screen"`` as the units.
@@ -1643,6 +1743,10 @@ class ScreenDistanceSpec(NumberSpec):
         Units are always ``"screen"``.
 
     '''
+
+    def __init__(self, default=None, help=None):
+        super(ScreenDistanceSpec, self).__init__(default=default, units_type=Enum(enums.enumeration("screen")), units_default="screen", help=help)
+
     def prepare_value(self, cls, name, value):
         try:
             if value is not None and value < 0:
@@ -1651,12 +1755,38 @@ class ScreenDistanceSpec(NumberSpec):
             pass
         return super(ScreenDistanceSpec, self).prepare_value(cls, name, value)
 
+    def make_descriptors(self, base_name):
+        ''' Return a list of ``PropertyDescriptor`` instances to install on a
+        class, in order to delegate attribute access to this property.
+
+        Unlike simpler property types, ``UnitsSpec`` returns multiple
+        descriptors to install. In particular, descriptors for the base
+        property as well as the associated units property are returned.
+
+        Args:
+            name (str) : the name of the property these descriptors are for
+
+        Returns:
+            list[PropertyDescriptor]
+
+        The descriptors returned are collected by the ``MetaHasProps``
+        metaclass and added to ``HasProps`` subclasses during class creation.
+        '''
+        units_props = self._units_type.make_descriptors("unused")
+        return [ UnitsSpecPropertyDescriptor(base_name, self, units_props[0]) ]
+
     def to_serializable(self, obj, name, val):
-        d = super(ScreenDistanceSpec, self).to_serializable(obj, name, val)
-        d["units"] = "screen"
+        d = super(UnitsSpec, self).to_serializable(obj, name, val)
+        if d is not None and 'units' not in d:
+            # d is a PropertyValueDict at this point, we need to convert it to
+            # a plain dict if we are going to modify its value, otherwise a
+            # notify_change that should not happen will be triggered
+            d = dict(d)
+            d["units"] = "screen"
         return d
 
-class DataDistanceSpec(NumberSpec):
+
+class DataDistanceSpec(UnitsSpec):
     ''' A |DataSpec| property that accepts numeric fixed values for data-space
     distances, and also provides an associated units property that reports
     ``"data"`` as the units.
@@ -1665,6 +1795,9 @@ class DataDistanceSpec(NumberSpec):
         Units are always ``"data"``.
 
     '''
+    def __init__(self, default=None, help=None):
+        super(DataDistanceSpec, self).__init__(default=default, units_type=Enum(enums.enumeration("data")), units_default="data", help=help)
+
     def prepare_value(self, cls, name, value):
         try:
             if value is not None and value < 0:
@@ -1673,9 +1806,34 @@ class DataDistanceSpec(NumberSpec):
             pass
         return super(DataDistanceSpec, self).prepare_value(cls, name, value)
 
+    def make_descriptors(self, base_name):
+        ''' Return a list of ``PropertyDescriptor`` instances to install on a
+        class, in order to delegate attribute access to this property.
+
+        Unlike simpler property types, ``UnitsSpec`` returns multiple
+        descriptors to install. In particular, descriptors for the base
+        property as well as the associated units property are returned.
+
+        Args:
+            name (str) : the name of the property these descriptors are for
+
+        Returns:
+            list[PropertyDescriptor]
+
+        The descriptors returned are collected by the ``MetaHasProps``
+        metaclass and added to ``HasProps`` subclasses during class creation.
+        '''
+        units_props = self._units_type.make_descriptors("unused")
+        return [ UnitsSpecPropertyDescriptor(base_name, self, units_props[0]) ]
+
     def to_serializable(self, obj, name, val):
-        d = super(ScreenDistanceSpec, self).to_serializable(obj, name, val)
-        d["units"] = "data"
+        d = super(UnitsSpec, self).to_serializable(obj, name, val)
+        if d is not None and 'units' not in d:
+            # d is a PropertyValueDict at this point, we need to convert it to
+            # a plain dict if we are going to modify its value, otherwise a
+            # notify_change that should not happen will be triggered
+            d = dict(d)
+            d["units"] = "data"
         return d
 
 class ColorSpec(DataSpec):
@@ -1703,8 +1861,8 @@ class ColorSpec(DataSpec):
         m.color = field("firebrick")       # field (named "firebrick")
 
     '''
-    def __init__(self, default, help=None):
-        super(ColorSpec, self).__init__(Color, default=default, help=help)
+    def __init__(self, default, help=None, key_type=_ExprFieldValueTransform):
+        super(ColorSpec, self).__init__(key_type, Color, default=default, help=help)
 
     @classmethod
     def isconst(cls, val):
@@ -1732,14 +1890,21 @@ class ColorSpec(DataSpec):
 
         # Check for RGB or RGBa tuple
         if isinstance(val, tuple):
-            return dict(value=RGB(*val).to_css())
+            return dict(value=colors.RGB(*val).to_css())
 
         # Check for data source field name
+        if isinstance(val, colors.RGB):
+            return val.to_css()
+
+        # Check for data source field name or rgb(a) string
         if isinstance(val, string_types):
+            if val.startswith(("rgb(", "rgba(")):
+                return val
+
             return dict(field=val)
 
-        # Must be dict, return as-is
-        return val
+        # Must be dict, return new dict
+        return dict(val)
 
     def prepare_value(self, cls, name, value):
         # Some explanation is in order. We want to accept tuples like
@@ -1759,13 +1924,38 @@ class ColorSpec(DataSpec):
 # DataSpec helpers
 #------------------------------------------------------------------------------
 
-def field(name):
+def expr(expression, transform=None):
+    ''' Convenience function to explicitly return an "expr" specification for
+    a Bokeh :class:`~bokeh.core.properties.DataSpec` property.
+
+    Args:
+        expression (Expression) : a computed expression for a
+            ``DataSpec`` property.
+
+        transform (Transform, optional) : a transform to apply (default: None)
+
+    Returns:
+        dict : ``{ "expr": expression }``
+
+    .. note::
+        This function is included for completeness. String values for
+        property specifications are by default interpreted as field names.
+
+    '''
+    if transform:
+        return dict(expr=expression, transform=transform)
+    return dict(expr=expression)
+
+
+def field(name, transform=None):
     ''' Convenience function to explicitly return a "field" specification for
     a Bokeh :class:`~bokeh.core.properties.DataSpec` property.
 
     Args:
         name (str) : name of a data source field to reference for a
             ``DataSpec`` property.
+
+        transform (Transform, optional) : a transform to apply (default: None)
 
     Returns:
         dict : ``{ "field": name }``
@@ -1775,14 +1965,18 @@ def field(name):
         property specifications are by default interpreted as field names.
 
     '''
+    if transform:
+        return dict(field=name, transform=transform)
     return dict(field=name)
 
-def value(val):
+def value(val, transform=None):
     ''' Convenience function to explicitly return a "value" specification for
     a Bokeh :class:`~bokeh.core.properties.DataSpec` property.
 
     Args:
         val (any) : a fixed value to specify for a ``DataSpec`` property.
+
+        transform (Transform, optional) : a transform to apply (default: None)
 
     Returns:
         dict : ``{ "value": name }``
@@ -1802,6 +1996,8 @@ def value(val):
                    text_font_size=value("12pt"), source=source)
 
     '''
+    if transform:
+        return dict(value=val, transform=transform)
     return dict(value=val)
 
 #------------------------------------------------------------------------------
@@ -1867,6 +2063,6 @@ _data_specs = "\n".join(sorted(".. autoclass:: %s" % x.__name__ for x in _find_a
 _containers = "\n".join(sorted(".. autoclass:: %s" % x.__name__ for x in _find_and_remove(ContainerProperty)))
 _basic = "\n".join(sorted(".. autoclass:: %s" % x.__name__ for x in _all_props))
 
-__doc__ = __doc__ % (_basic, _containers, _data_specs)
+__doc__ = format_docstring(__doc__, basic_properties=_basic, container_properties=_containers, dataspec_properties=_data_specs)
 
 del _all_props, _data_specs, _containers, _basic, _find_and_remove

@@ -9,8 +9,7 @@ Using Palettes
 --------------
 
 Palettes are sequences (lists or tuples) of RGB(A) hex strings that define a
-colormap and be can set as the ``palette`` attribute of all chart types from
-``bokeh.charts`` and as the ``color`` attribute of many plot objects from
+colormap and be can set as the ``color`` attribute of many plot objects from
 ``bokeh.plotting``. Bokeh offers many of the standard Brewer palettes, which
 can be imported from the ``bokeh.palettes`` module. For example, importing
 “Spectral6” gives a six element list of RGB(A) hex strings from the Brewer
@@ -140,7 +139,7 @@ Screen Units and Data-space Units
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Screen units use raw numbers of pixels to specify height or width, while
-data-space units are relative to the data and the axes of the chart. For
+data-space units are relative to the data and the axes of the plot. For
 example, in a 400 pixel by 400 pixel graph with x and y axes ranging from 0
 through 10, a glyph one fifth as wide and tall as the graph would be 80 screen
 units or 2 data-space units.
@@ -198,9 +197,8 @@ Dimensions
 The dimensions (width and height) of a |Plot| are controlled by ``plot_width``
 and ``plot_height`` attributes. These values are in screen units, and they
 control the size of the entire canvas area, including any axes or titles (but
-not the toolbar). If you are using the |bokeh.plotting| or |bokeh.charts|
-interfaces, then these values can be passed to |figure| or the Chart function
-as a convenience:
+not the toolbar). If you are using the |bokeh.plotting| interface, then these
+values can be passed to |figure| as a convenience:
 
 .. bokeh-plot:: docs/user_guide/examples/styling_dimensions.py
     :source-position: above
@@ -211,37 +209,33 @@ as a convenience:
 Responsive Dimensions
 ~~~~~~~~~~~~~~~~~~~~~
 
-In addition, you can use the ``responsive`` attribute. The responsive attribute
-causes the plot to fill the container it's sitting in, and to respond to
-changes in browser size. Responsive web elements are common-place in web
-development and the ``responsive`` flag may be useful if you are trying to
-present your plot on a website where you want it to conform to a number of
-browsers. If you set the responsive flag, the ``plot_width`` and ``plot_height`` will
+For control over how the plot scales to fill its container, see the
+documentation for :ref:`bokeh.models.layouts`, in particular the
+``sizing_mode`` property of :class:`~bokeh.models.layouts.LayoutDOM`.
+
+If you set ``sizing_mode``, the ``plot_width`` and ``plot_height`` may
 immediately change when a plot is rendered to fill the container. However,
 those parameters will be used to calculate the initial aspect ratio for your
 plot, so you may want to keep them. Plots will only resize down to a minimum of
 100px (height or width) to prevent problems in displaying your plot.
 
-For more precise control over how the plot scales to fill its container,
-see the documentation for :ref:`bokeh.models.layouts`, in particular the
-``sizing_mode`` property of :class:`~bokeh.models.layouts.LayoutDOM`.
-
-.. warning::
-    This feature is known not to work when combined with HBox.
-    This is a new feature and may have other issues when used in different circumstances.
-    Please report these issues on the  `Bokeh GitHub repository`_ or the `Bokeh mailing list`_.
-
 .. _Bokeh GitHub repository: https://github.com/bokeh/bokeh
-.. _Bokeh mailing list: https://groups.google.com/a/continuum.io/forum/#!forum/bokeh
+.. _Bokeh mailing list: https://groups.google.com/a/anaconda.com/forum/#!forum/bokeh
 
 .. _userguide_styling_plot_title:
 
 Title
 ~~~~~
 
-The styling of the plot title is controlled by a set of `Text Properties`_
-on a |Title| annotation available as the ``.title`` property of the |Plot|.
-For instance, to set the color of the title text, use ``plot.title.text_color``:
+The styling of the plot title is controlled by the properties of |Title|
+annotation, which is available as the ``.title`` property on the |Plot|.
+Most of the standard `Text Properties`_ are available, with the exception
+of ``text_align`` and ``text_baseline`` which do not apply. For positioning
+the title relative to the entire plot, use the properties ``align`` and
+``offset``.
+
+As an example, to set the color and font style of the title text, use
+``plot.title.text_color``:
 
 .. bokeh-plot:: docs/user_guide/examples/styling_title.py
     :source-position: above
@@ -469,16 +463,29 @@ Tick Locations
 
 Bokeh has several "ticker" models that can choose nice locations for ticks.
 These are configured on the ``.ticker`` property of an axis. With the
-|bokeh.plotting| and |bokeh.charts| interfaces, choosing an appropriate ticker
-type (categorical, datetime, linear or log scale) normally happens
-automatically. However, there are cases when more explicit control is
-useful.
+|bokeh.plotting| interface, choosing an appropriate ticker type (categorical,
+datetime, mercator, linear or log scale) normally happens automatically.
+However, there are cases when more explicit control is useful.
 
 ``FixedTicker``
 '''''''''''''''
 
 This ticker model allows users to specify exact tick locations
-explicitly.
+explicitly, e.g.
+
+.. code-block:: python
+
+    from bokeh.plotting import figure
+    from bokeh.models.tickers import FixedTicker
+
+    p = figure()
+
+    # no additional tick locations will be displayed on the x-axis
+    p.xaxis.ticker = FixedTicker(ticks=[10, 20, 37.4])
+
+However it is also possible to supply the list of ticks directly, as a
+shortcut, e.g. ``p.xaxis.ticker = [10, 20, 37.4]``. The example below
+demonstrates this method.
 
 .. bokeh-plot:: docs/user_guide/examples/styling_fixed_ticker.py
     :source-position: above
@@ -846,7 +853,6 @@ spacing, etc. of the legend components:
 
 .. |figure| replace:: :func:`~bokeh.plotting.figure`
 
-.. |bokeh.charts|   replace:: :ref:`bokeh.charts <bokeh.charts>`
 .. |bokeh.plotting| replace:: :ref:`bokeh.plotting <bokeh.plotting>`
 
 .. |Range1d| replace:: :class:`~bokeh.models.ranges.Range1d`

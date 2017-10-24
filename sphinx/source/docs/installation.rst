@@ -13,7 +13,7 @@ Dependencies
 ============
 
 Bokeh is officially supported (and continuously tested) on CPython versions 2.7
-and 3.4+ only. Other Python versions may function, possibly in limited capacity.
+and 3.5+ only. Other Python versions may function, possibly in limited capacity.
 In particular, converting NumPy arrays to lists may be useful with other versions.
 However, this guidance is only provided as-is, in case it happens to be useful,
 and does not imply any level of official support for other Python versions. All
@@ -38,14 +38,11 @@ package.
 Because the Bokeh client library is mostly concerned with providing a nice
 Python interface for generating JSON objects which are then consumed by the
 BokehJS library running in the browser, there shouldn't be a *hard* dependency
-on any of the standard NumPy/SciPy stack.  It is entirely possible to use
+on any of the standard NumPy/SciPy stack. It is entirely possible to use
 Bokeh with plain Python lists of values. However, the Bokeh plot server does
 make direct use of NumPy, and it is required to be installed for Bokeh apps
-to function.
-
-Additionally the ``bokeh.charts`` interface and various examples
-depend on the Pandas library; it is recommended to install Pandas version 0.16.1
-or later.
+to function. Additionally nodejs is required to allow compilation of custom
+bokeh extensions.
 
 .. _install_packages:
 
@@ -64,7 +61,7 @@ If you are already an Anaconda user, you can simply run the command:
     conda install bokeh
 
 This will install the most recent published Bokeh release from the
-`Continuum Analytics`_ Anaconda repository, along with all dependencies.
+`Anaconda, Inc.`_ package repository, along with all dependencies.
 
 Alternatively, it is possible to install from PyPI using ``pip``:
 
@@ -159,33 +156,42 @@ pydata.org, under the following naming scheme::
 
     http://cdn.pydata.org/bokeh/release/bokeh-x.y.z.min.js
     http://cdn.pydata.org/bokeh/release/bokeh-widgets-x.y.z.min.js
+    http://cdn.pydata.org/bokeh/release/bokeh-tables-x.y.z.min.js
 
 for the BokehJS JavaScript files, and::
 
     http://cdn.pydata.org/bokeh/release/bokeh-x.y.z.min.css
     http://cdn.pydata.org/bokeh/release/bokeh-widgets-x.y.z.min.css
+    http://cdn.pydata.org/bokeh/release/bokeh-tables-x.y.z.min.css
 
 for the BokehJS CSS files.
 
+.. note::
+    The CSS must be loaded *before* the JavaScript library.
+
 The ``"-widgets"`` files are only necessary if you are using any of the widgets
-built into Bokeh in ``bokeh.models.widgets`` in your documents.
+built into Bokeh in ``bokeh.models.widgets`` in your documents. Similarly, the
+``"-tables"`` files are only necessary if you are using Bokeh data tables in
+your document.
 
-As a concrete example, the links for version ``0.12`` are:
+As a concrete example, the links for version ``0.12.9`` are:
 
-* http://cdn.pydata.org/bokeh/release/bokeh-0.12.0.min.js
-* http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.0.min.js
+* http://cdn.pydata.org/bokeh/release/bokeh-0.12.9.min.js
+* http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.9.min.js
+* http://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.9.min.js
 
 and
 
-* http://cdn.pydata.org/bokeh/release/bokeh-0.12.0.min.css
-* http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.0.min.css
+* http://cdn.pydata.org/bokeh/release/bokeh-0.12.9.min.css
+* http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.9.min.css
+* http://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.9.min.css
 
 .. note::
     For releases ``0.12.2`` and after, the BokehJS API has been branched to a separate file.
     It is also available for download from CDN at pydata.org under the name bokeh-api using
-    the above naming scheme.
+    the above naming scheme. It must be loaded *after* the JavaScript library.
 
-.. _Anaconda Python Distribution: http://continuum.io/anaconda
+.. _Anaconda Python Distribution: http://anaconda.com/anaconda
 .. _anaconda.org: http://anaconda.org
-.. _Continuum Analytics: http://continuum.io
+.. _Anaconda, Inc.: http://anaconda.com
 .. _npmjs.org: https://www.npmjs.org/package/bokehjs

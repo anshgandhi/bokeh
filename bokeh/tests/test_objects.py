@@ -5,8 +5,6 @@ from six.moves import xrange
 import copy
 from bokeh.core.properties import List, String, Instance, Dict, Any, Int
 from bokeh.model import Model
-from bokeh.embed import _ModelInDocument
-from bokeh.document import Document
 from bokeh.core.property.containers import PropertyValueList, PropertyValueDict
 from bokeh.util.future import with_metaclass
 
@@ -15,7 +13,7 @@ def large_plot(n):
     from bokeh.models import (
         Plot, LinearAxis, Grid, GlyphRenderer,
         ColumnDataSource, DataRange1d, PanTool, ZoomInTool, ZoomOutTool, WheelZoomTool, BoxZoomTool,
-        BoxSelectTool, ResizeTool, SaveTool, ResetTool
+        BoxSelectTool, SaveTool, ResetTool
     )
     from bokeh.models.layouts import Column
     from bokeh.models.glyphs import Line
@@ -42,15 +40,14 @@ def large_plot(n):
         wheel_zoom = WheelZoomTool()
         box_zoom = BoxZoomTool()
         box_select = BoxSelectTool()
-        resize = ResizeTool()
         save = SaveTool()
         reset = ResetTool()
-        tools = [pan, zoom_in, zoom_out, wheel_zoom, box_zoom, box_select, resize, save, reset]
+        tools = [pan, zoom_in, zoom_out, wheel_zoom, box_zoom, box_select, save, reset]
         plot.add_tools(*tools)
         col.children.append(plot)
         objects |= set([
-            source, xdr, ydr, plot, xaxis, yaxis, xgrid, ygrid, renderer, glyph,
-            plot.toolbar, plot.tool_events, plot.title, box_zoom.overlay, box_select.overlay] +
+            source, xdr, ydr, plot, xaxis, yaxis, xgrid, ygrid, renderer, renderer.view, glyph, plot.x_scale, plot.y_scale,
+            plot.toolbar, plot.title, box_zoom.overlay, box_select.overlay] +
             tickers + tools)
 
     return col, objects
@@ -304,75 +301,6 @@ class TestModel(unittest.TestCase):
         # 'child' is a default, but it gets included as a
         # non-default because it's unstable.
         self.assertTrue('child' in obj1.properties_with_values(include_defaults=False))
-
-class SomeModelInTestObjects(Model):
-    child = Instance(Model)
-
-class TestModelInDocument(unittest.TestCase):
-    def test_single_model(self):
-        p = Model()
-        self.assertIs(p.document, None)
-        with _ModelInDocument([p]):
-            self.assertIsNot(p.document, None)
-        self.assertIs(p.document, None)
-
-    def test_list_of_model(self):
-        p1 = Model()
-        p2 = Model()
-        self.assertIs(p1.document, None)
-        self.assertIs(p2.document, None)
-        with _ModelInDocument([p1, p2]):
-            self.assertIsNot(p1.document, None)
-            self.assertIsNot(p2.document, None)
-        self.assertIs(p1.document, None)
-        self.assertIs(p2.document, None)
-
-    def test_uses_precedent(self):
-        # it's deliberate that the doc is on p2, so _ModelInDocument
-        # has to be smart about looking for a doc anywhere in the list
-        # before it starts inventing new documents
-        doc = Document()
-        p1 = Model()
-        p2 = Model()
-        doc.add_root(p2)
-        self.assertIs(p1.document, None)
-        self.assertIsNot(p2.document, None)
-        with _ModelInDocument([p1, p2]):
-            self.assertIsNot(p1.document, None)
-            self.assertIsNot(p2.document, None)
-            self.assertIs(p1.document, doc)
-            self.assertIs(p2.document, doc)
-        self.assertIs(p1.document, None)
-        self.assertIsNot(p2.document, None)
-
-    def test_uses_doc_precedent(self):
-        doc = Document()
-        p1 = Model()
-        p2 = Model()
-        self.assertIs(p1.document, None)
-        self.assertIs(p2.document, None)
-        with _ModelInDocument([p1, p2, doc]):
-            self.assertIsNot(p1.document, None)
-            self.assertIsNot(p2.document, None)
-            self.assertIs(p1.document, doc)
-            self.assertIs(p2.document, doc)
-        self.assertIs(p1.document, None)
-        self.assertIs(p2.document, None)
-
-    def test_with_doc_in_child_raises_error(self):
-        doc = Document()
-        p1 = Model()
-        p2 = SomeModelInTestObjects(child=Model())
-        doc.add_root(p2.child)
-        self.assertIs(p1.document, None)
-        self.assertIs(p2.document, None)
-        self.assertIs(p2.child.document, doc)
-        with self.assertRaisesRegexp(RuntimeError, p2._id):
-            with _ModelInDocument([p1, p2]):
-                self.assertIsNot(p1.document, None)
-                self.assertIsNot(p2.document, None)
-                self.assertIs(p1.document, doc)
-                self.assertIs(p2.document, doc)
 
 class TestContainerMutation(unittest.TestCase):
 

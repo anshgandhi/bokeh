@@ -88,13 +88,6 @@ def get_class(view_model_name):
     from . import models; models
     from .plotting import Figure; Figure
 
-    # We have to try-except here, because this import will fail if Pandas is
-    # not installed, but in that case bokeh.charts is not usable anyway
-    try:
-        from .charts import Chart; Chart
-    except RuntimeError:
-        pass
-
     d = MetaModel.model_class_reverse_map
     if view_model_name in d:
         return d[view_model_name]
@@ -276,10 +269,11 @@ class Model(with_metaclass(MetaModel, HasProps, PropertyCallbackManager, EventCa
     """)
 
     js_event_callbacks = Dict(String, List(Instance("bokeh.models.callbacks.CustomJS")),
-    help="""A mapping of event names to lists of CustomJS callbacks.
+    help="""
+    A mapping of event names to lists of CustomJS callbacks.
 
     Typically, rather then modifying this property directly, callbacks should be
-    added using the ``Model.js_on_event`` method:)
+    added using the ``Model.js_on_event`` method:
 
     .. code:: python
 
@@ -291,7 +285,7 @@ class Model(with_metaclass(MetaModel, HasProps, PropertyCallbackManager, EventCa
     List of events that are subscribed to by Python callbacks. This is
     the set of events that will be communicated from BokehJS back to
     Python for this model.
-     """   )
+    """)
 
     js_property_callbacks = Dict(String, List(Instance("bokeh.models.callbacks.CustomJS")), help="""
     A mapping of attribute names to lists of CustomJS callbacks, to be set up on
@@ -377,7 +371,7 @@ class Model(with_metaclass(MetaModel, HasProps, PropertyCallbackManager, EventCa
 
         .. code:: python
 
-            source.js_on_change('stream', callback)
+            source.js_on_change('streaming', callback)
 
         '''
         if len(callbacks) == 0:
@@ -536,7 +530,7 @@ class Model(with_metaclass(MetaModel, HasProps, PropertyCallbackManager, EventCa
         # this may need to be further refined in the future, if the a
         # assumption does not hold for future hinted events (e.g. the hint
         # could specify explicitly whether to do normal invalidation or not)
-        if not hint:
+        if hint is None:
             dirty = { 'count' : 0 }
             def mark_dirty(obj):
                 dirty['count'] += 1
@@ -546,7 +540,7 @@ class Model(with_metaclass(MetaModel, HasProps, PropertyCallbackManager, EventCa
                 if dirty['count'] > 0:
                     self._document._invalidate_all_models()
         # chain up to invoke callbacks
-        super(Model, self).trigger(attr, old, new, hint, setter)
+        super(Model, self).trigger(attr, old, new, hint=hint, setter=setter)
 
     def _attach_document(self, doc):
         ''' Attach a model to a Bokeh |Document|.

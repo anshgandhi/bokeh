@@ -30,7 +30,7 @@ class IonRangeSlider(InputWidget):
     # also support type validation. More information about properties in
     # can be found here:
     #
-    #    http://bokeh.pydata.org/en/latest/docs/reference/core.html#bokeh-core-properties
+    #    https://bokeh.pydata.org/en/latest/docs/reference/core.html#bokeh-core-properties
 
     disable = Bool(default=True, help="""
     Enable or disable the slider.
@@ -89,7 +89,7 @@ callback_single = CustomJS(args=dict(source=source), code="""
         for (i = 0; i < x.length; i++) {
             y[i] = Math.pow(x[i], f)
         }
-        source.trigger('change');
+        source.change.emit();
     """)
 
 
@@ -105,7 +105,7 @@ callback_ion = CustomJS(args=dict(source=source), code="""
             x[i] = delta*i + f[0]
             y[i] = Math.pow(x[i], pow)
         }
-        source.trigger('change');
+        source.change.emit();
     """)
 
 

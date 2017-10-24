@@ -12,7 +12,7 @@ from tornado import gen
 from bokeh.core.templates import AUTOLOAD_JS
 from bokeh.util.string import encode_utf8
 from bokeh.util.compiler import bundle_all_models
-from bokeh.embed import _script_for_render_items
+from bokeh.embed.standalone import script_for_render_items
 
 from .session_handler import SessionHandler
 
@@ -20,12 +20,6 @@ class AutoloadJsHandler(SessionHandler):
     ''' Implements a custom Tornado handler for the autoload JS chunk
 
     '''
-    def __init__(self, tornado_app, *args, **kw):
-        super(AutoloadJsHandler, self).__init__(tornado_app, *args, **kw)
-
-    def initialize(self, *args, **kw):
-        pass
-
     @gen.coroutine
     def get(self, *args, **kwargs):
         session = yield self.get_session()
@@ -47,11 +41,19 @@ class AutoloadJsHandler(SessionHandler):
         bundle = bundle_all_models()
 
         render_items = [dict(sessionid=session.id, elementid=element_id, use_for_title=False)]
-        script = _script_for_render_items(None, render_items, app_path=app_path, absolute_url=absolute_url)
+        script = script_for_render_items(None, render_items, app_path=app_path, absolute_url=absolute_url)
+
+        resources_param = self.get_argument("resources", "default")
+        if resources_param == "none":
+            js_urls = []
+            css_urls = []
+        else:
+            js_urls = resources.js_files
+            css_urls = resources.css_files
 
         js = AUTOLOAD_JS.render(
-            js_urls = resources.js_files,
-            css_urls = resources.css_files,
+            js_urls = js_urls,
+            css_urls = css_urls,
             js_raw = resources.js_raw + [bundle, script],
             css_raw = resources.css_raw_str,
             elementid = element_id,

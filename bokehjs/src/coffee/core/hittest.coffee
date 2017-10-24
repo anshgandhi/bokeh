@@ -1,4 +1,5 @@
-import {sortBy} from "./util/array"
+import {union, concat, sortBy} from "./util/array"
+import {merge} from "./util/object"
 
 export point_in_poly = (x, y, px, py) ->
   inside = false
@@ -48,7 +49,13 @@ export class HitTestResult
   Object.defineProperty(this.prototype, '_2d', { get: () -> @['2d'] })
 
   is_empty: () ->
-    @_0d.indices.length == 0 && @_1d.indices.length == 0
+    @_0d.indices.length == 0 && @_1d.indices.length == 0 && Object.keys(@_2d.indices).length == 0
+
+  update_through_union: (other) ->
+    @['0d'].indices = union(other['0d'].indices, @['0d'].indices)
+    @['0d'].glyph = other['0d'].glyph or @['0d'].glyph
+    @['1d'].indices = union(other['1d'].indices, @['1d'].indices)
+    @['2d'].indices = merge(other['2d'].indices, @['2d'].indices)
 
 export create_hit_test_result = () -> new HitTestResult()
 
@@ -66,7 +73,7 @@ export validate_bbox_coords = ([x0, x1], [y0, y1]) ->
 sqr = (x) -> x * x
 export dist_2_pts = (vx, vy, wx, wy) -> sqr(vx - wx) + sqr(vy - wy)
 
-dist_to_segment_squared = (p, v, w) ->
+export dist_to_segment_squared = (p, v, w) ->
   l2 = dist_2_pts(v.x, v.y, w.x, w.y)
   if (l2 == 0)
     return dist_2_pts(p.x, p.y, v.x, v.y)

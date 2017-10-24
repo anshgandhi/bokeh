@@ -3,18 +3,24 @@
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 //     Underscore may be freely distributed under the MIT license.
 
+import {randomIn} from "./math"
+
 const slice = Array.prototype.slice
+
+export function last<T>(array: Array<T>): T | undefined {
+  return array[array.length-1]
+}
 
 export function copy<T>(array: Array<T> /*| TypedArray*/): Array<T> {
   return slice.call(array)
 }
 
 export function concat<T>(arrays: Array<Array<T>>): Array<T> {
-  return [].concat(...arrays)
+  return ([] as T[]).concat(...arrays)
 }
 
 export function contains<T>(array: Array<T>, value: T): boolean {
-  return array.indexOf(value) >= 0
+  return array.indexOf(value) !== -1
 }
 
 export function nth<T>(array: Array<T>, index: number): T {
@@ -109,14 +115,15 @@ export function min(array: Array<number>): number {
 }
 
 export function minBy<T>(array: Array<T>, key: (item: T) => number): T {
-  let value: T
-  let result: T
-  let computed: number
-  let resultComputed = Infinity
+  if (array.length == 0)
+    throw new Error("minBy() called with an empty array")
 
-  for (let i = 0, length = array.length; i < length; i++) {
-    value = array[i]
-    computed = key(value)
+  let result = array[0]
+  let resultComputed = key(result)
+
+  for (let i = 1, length = array.length; i < length; i++) {
+    const value = array[i]
+    const computed = key(value)
     if (computed < resultComputed) {
       result = value
       resultComputed = computed
@@ -141,14 +148,15 @@ export function max(array: Array<number>): number {
 }
 
 export function maxBy<T>(array: Array<T>, key: (item: T) => number): T {
-  let value: T
-  let result: T
-  let computed: number
-  let resultComputed = -Infinity
+  if (array.length == 0)
+    throw new Error("maxBy() called with an empty array")
 
-  for (let i = 0, length = array.length; i < length; i++) {
-    value = array[i]
-    computed = key(value)
+  let result = array[0]
+  let resultComputed = key(result)
+
+  for (let i = 1, length = array.length; i < length; i++) {
+    const value = array[i]
+    const computed = key(value)
     if (computed > resultComputed) {
       result = value
       resultComputed = computed
@@ -196,6 +204,16 @@ function findIndexFactory(dir: number) {
 
 export const findIndex = findIndexFactory(1)
 export const findLastIndex = findIndexFactory(-1)
+
+export function find<T>(array: Array<T>, predicate: (item: T) => boolean): T | undefined {
+  const index = findIndex(array, predicate)
+  return index == -1 ? undefined : array[index]
+}
+
+export function findLast<T>(array: Array<T>, predicate: (item: T) => boolean): T | undefined {
+  const index = findLastIndex(array, predicate)
+  return index == -1 ? undefined : array[index]
+}
 
 export function sortedIndex<T>(array: Array<T>, value: T): number {
   let low = 0
@@ -260,7 +278,7 @@ export function intersection<T>(array: Array<T>, ...arrays: Array<Array<T>>): Ar
       continue
     for (const other of arrays) {
       if (!contains(other, item))
-        continue top;
+        continue top
     }
     result.push(item)
   }
@@ -270,4 +288,38 @@ export function intersection<T>(array: Array<T>, ...arrays: Array<Array<T>>): Ar
 export function difference<T>(array: Array<T>, ...arrays: Array<Array<T>>): Array<T> {
   const rest = concat(arrays)
   return array.filter((value) => !contains(rest, value))
+}
+
+export function removeBy<T>(array: Array<T>, key: (item: T) => boolean): void {
+  for (let i = 0; i < array.length;) {
+    if (key(array[i]))
+      array.splice(i, 1)
+    else
+      i++
+  }
+}
+
+// Shuffle a collection, using the modern version of the
+// [Fisher-Yates shuffle](http://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+export function shuffle<T>(array: T[]): T[] {
+  const length = array.length
+  const shuffled = new Array(length)
+  for (let i = 0; i < length; i++) {
+    let rand = randomIn(0, i)
+    if (rand !== i)
+      shuffled[i] = shuffled[rand]
+    shuffled[rand] = array[i]
+  }
+  return shuffled
+}
+
+export function pairwise<T, U>(array: T[], fn: (prev: T, next: T) => U): U[] {
+  const n = array.length
+  const result = new Array<U>(n-1)
+
+  for (let i = 0; i < n - 1; i++) {
+    result[i] = fn(array[i], array[i+1])
+  }
+
+  return result
 }

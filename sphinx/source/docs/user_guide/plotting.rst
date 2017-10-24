@@ -68,6 +68,19 @@ method:
 .. bokeh-plot:: docs/user_guide/examples/plotting_line_single.py
     :source-position: above
 
+Step Lines
+''''''''''
+
+For some kinds of data, it may be more appropriate to draw discrete steps
+between data points, instead of connecting points with linear segments. The
+|step| glyph method can be used to accomplish this:
+
+.. bokeh-plot:: docs/user_guide/examples/plotting_line_steps.py
+    :source-position: above
+
+Step levels can be drawn before, after, or centered on the x-coordinates,
+as condfigured by the ``mode`` parameter.
+
 Multiple Lines
 ''''''''''''''
 
@@ -331,6 +344,11 @@ when using |bokeh.plotting| interface.
 Categorical Axes
 ~~~~~~~~~~~~~~~~
 
+Categorical axes are created by specifying a
+:class:`~bokeh.models.ranges.FactorRange` for one of the plot ranges (or a
+lists of factors to be converted to one). Below is a simple example, for
+complete details see :ref:`userguide_categorical`.
+
 .. bokeh-plot:: docs/user_guide/examples/plotting_categorical_axis.py
     :source-position: above
 
@@ -435,10 +453,11 @@ The section on adding annotations to plots has moved.  Please see
 .. |ray|               replace:: :func:`~bokeh.plotting.figure.Figure.ray`
 .. |rect|              replace:: :func:`~bokeh.plotting.figure.Figure.rect`
 .. |segment|           replace:: :func:`~bokeh.plotting.figure.Figure.segment`
+.. |step|              replace:: :func:`~bokeh.plotting.figure.Figure.step`
 .. |square|            replace:: :func:`~bokeh.plotting.figure.Figure.square`
 .. |square_cross|      replace:: :func:`~bokeh.plotting.figure.Figure.square_cross`
 .. |square_x|          replace:: :func:`~bokeh.plotting.figure.Figure.square_x`
 .. |triangle|          replace:: :func:`~bokeh.plotting.figure.Figure.triangle`
-.. |vbar|              replace:: :func:`~bokeh.plotting.figure.Figure.rect`
+.. |vbar|              replace:: :func:`~bokeh.plotting.figure.Figure.vbar`
 .. |wedge|             replace:: :func:`~bokeh.plotting.figure.Figure.wedge`
 .. |x|                 replace:: :func:`~bokeh.plotting.figure.Figure.x`

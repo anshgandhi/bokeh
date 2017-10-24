@@ -73,7 +73,7 @@ export class Surface3dView extends LayoutDOMView
 
     # Set Backbone listener so that when the Bokeh data source has a change
     # event, we can process the new data
-    @listenTo(@model.data_source, 'change', () =>
+    @connect(@model.data_source.change, () =>
         @_graph.setData(@get_data())
     )
 
@@ -135,7 +135,7 @@ class Surface3d(LayoutDOM):
     # also support type validation. More information about properties in
     # can be found here:
     #
-    #    http://bokeh.pydata.org/en/latest/docs/reference/core.html#bokeh-core-properties
+    #    https://bokeh.pydata.org/en/latest/docs/reference/core.html#bokeh-core-properties
 
     # This is a Bokeh ColumnDataSource that can be updated in the Bokeh
     # server by Python code

@@ -4,22 +4,22 @@ import {DataRange1d} from "../ranges/data_range1d"
 import {GlyphRenderer} from "../renderers/glyph_renderer"
 import {LayoutDOM} from "../layouts/layout_dom"
 
-import {build_views} from "core/build_views"
+import {Signal} from "core/signaling"
+import {build_views, remove_views} from "core/build_views"
 import {UIEvents} from "core/ui_events"
 import {LODStart, LODEnd} from "core/bokeh_events"
 import {LayoutCanvas} from "core/layout/layout_canvas"
 import {Visuals} from "core/visuals"
-import {BokehView} from "core/bokeh_view"
-import {EQ, GE} from "core/layout/solver"
+import {DOMView} from "core/dom_view"
+import {EQ, LE, GE} from "core/layout/solver"
 import {logger} from "core/logging"
 import * as enums from "core/enums"
 import * as p from "core/properties"
 import {throttle} from "core/util/throttle"
 import {isStrictNaN} from "core/util/types"
-import {difference, sortBy} from "core/util/array"
+import {difference, sortBy, pairwise, last} from "core/util/array"
 import {extend, values, isEmpty} from "core/util/object"
-import {defer} from "core/util/callback"
-import {update_constraints as update_panel_constraints} from "core/layout/side_panel"
+import {update_panel_constraints} from "core/layout/side_panel"
 
 # Notes on WebGL support:
 # Glyps can be rendered into the original 2D canvas, or in a (hidden)
@@ -34,34 +34,48 @@ import {update_constraints as update_panel_constraints} from "core/layout/side_p
 
 global_glcanvas = null
 
-export class PlotCanvasView extends BokehView
+export class PlotCanvasView extends DOMView
   className: "bk-plot-wrapper"
 
   state: { history: [], index: -1 }
 
-  view_options: () -> extend({plot_view: @}, @options)
+  view_options: () -> extend({plot_view: @, parent: @}, @options)
 
   pause: () ->
-    @is_paused = true
+    if not @_is_paused?
+      @_is_paused = 1
+    else
+      @_is_paused += 1
 
-  unpause: () ->
-    @is_paused = false
-    @request_render()
+  unpause: (no_render=false) ->
+    @_is_paused -= 1
+    if @_is_paused == 0 and not no_render
+      @request_render()
 
-  request_render: () =>
+  request_render: () ->
+    @request_paint()
+
+  request_paint: () ->
     if not @is_paused
-      @throttled_render()
+      @throttled_paint()
     return
 
-  remove: () =>
+  remove: () ->
+    remove_views(@renderer_views)
+    remove_views(@tool_views)
+
+    @canvas_view.remove()
+    @canvas_view = null
+
     super()
-    # When this view is removed, also remove all of the tools.
-    for id, tool_view of @tool_views
-      tool_view.remove()
 
   initialize: (options) ->
-    super(options)
     @pause()
+
+    super(options)
+
+    @force_paint = new Signal(this, "force_paint")
+    @state_changed = new Signal(this, "state_changed")
 
     @lod_started = false
     @visuals = new Visuals(@model.plot)
@@ -70,33 +84,24 @@ export class PlotCanvasView extends BokehView
       range: null                     # set later by set_initial_range()
       selection: {}                   # XXX: initial selection?
       dimensions: {
-        width: @model.canvas.width
-        height: @model.canvas.height
+        width: @model.canvas._width.value
+        height: @model.canvas._height.value
       }
     }
 
     # compat, to be removed
     @frame = @model.frame
-    @x_range = @frame.x_ranges['default']
-    @y_range = @frame.y_ranges['default']
-    @xmapper = @frame.x_mappers['default']
-    @ymapper = @frame.y_mappers['default']
 
     @canvas = @model.canvas
-    @canvas_view = new @canvas.default_view({'model': @canvas})
+    @canvas_view = new @canvas.default_view({model: @canvas, parent: @})
     @el.appendChild(@canvas_view.el)
-    @canvas_view.render(true)
+    @canvas_view.render()
 
     # If requested, try enabling webgl
-    if @model.plot.webgl
+    if @model.plot.output_backend == "webgl"
       @init_webgl()
 
-    @throttled_render = throttle(@render, 15) # TODO (bev) configurable
-
-    # Keep track of which plots of the canvas are not yet rendered
-    if not @model.document._unrendered_plots?
-      @model.document._unrendered_plots = {}  # poor man's set
-    @model.document._unrendered_plots[@id] = true
+    @throttled_paint = throttle((() => @force_paint.emit()), 15) # TODO (bev) configurable
 
     @ui_event_bus = new UIEvents(@, @model.toolbar, @canvas_view.el, @model.plot)
 
@@ -110,22 +115,20 @@ export class PlotCanvasView extends BokehView
     @build_levels()
     @build_tools()
 
-    @bind_bokeh_events()
+    @connect_signals()
     @update_dataranges()
 
-    @unpause()
+    @unpause(true)
     logger.debug("PlotView initialized")
 
     return this
-
-  get_canvas_element: () ->
-    return @canvas_view.ctx.canvas
 
   set_cursor: (cursor="default") ->
     @canvas_view.el.style.cursor = cursor
 
   @getters {
-    canvas_overlays: () -> @el.querySelector('.bk-canvas-overlays')
+    canvas_overlays: () -> @canvas_view.overlays_el
+    is_paused: () -> @_is_paused? and @_is_paused != 0
   }
 
   init_webgl: () ->
@@ -192,7 +195,7 @@ export class PlotCanvasView extends BokehView
     calculate_log_bounds = false
     for r in values(frame.x_ranges).concat(values(frame.y_ranges))
       if r instanceof DataRange1d
-        if r.mapper_hint == "log"
+        if r.scale_hint == "log"
           calculate_log_bounds = true
 
     for k, v of @renderer_views
@@ -207,9 +210,34 @@ export class PlotCanvasView extends BokehView
     follow_enabled = false
     has_bounds = false
 
+    if @model.plot.match_aspect != false and @frame._width.value != 0 and @frame._height.value != 0
+      r = 1/@model.plot.aspect_scale*(@frame._width.value/@frame._height.value)
+      for k, v of bounds
+        if isFinite(v.maxX) and isFinite(v.minX) and isFinite(v.maxY) and isFinite(v.minY)
+          width = v.maxX - v.minX
+          if width <= 0
+            width = 1.0
+
+          height = v.maxY - v.minY
+          if height <= 0
+            height = 1.0
+
+          xcenter = 0.5*(v.maxX + v.minX)
+          ycenter = 0.5*(v.maxY + v.minY)
+
+          if width < r*height
+            width = r*height
+          else
+            height = width/r
+
+          bounds[k].maxX = xcenter+0.5*width
+          bounds[k].minX = xcenter-0.5*width
+          bounds[k].maxY = ycenter+0.5*height
+          bounds[k].minY = ycenter-0.5*height
+
     for xr in values(frame.x_ranges)
       if xr instanceof DataRange1d
-        bounds_to_use = if xr.mapper_hint == "log" then log_bounds else bounds
+        bounds_to_use = if xr.scale_hint == "log" then log_bounds else bounds
         xr.update(bounds_to_use, 0, @model.id)
         if xr.follow
           follow_enabled = true
@@ -217,7 +245,7 @@ export class PlotCanvasView extends BokehView
 
     for yr in values(frame.y_ranges)
       if yr instanceof DataRange1d
-        bounds_to_use = if yr.mapper_hint == "log" then log_bounds else bounds
+        bounds_to_use = if yr.scale_hint == "log" then log_bounds else bounds
         yr.update(bounds_to_use, 1, @model.id)
         if yr.follow
           follow_enabled = true
@@ -243,11 +271,11 @@ export class PlotCanvasView extends BokehView
     @state.history.push({type: type, info: info})
     @state.index = @state.history.length - 1
 
-    @trigger("state_changed")
+    @state_changed.emit()
 
   clear_state: () ->
     @state = {history: [], index: -1}
-    @trigger("state_changed")
+    @state_changed.emit()
 
   can_undo: () ->
     @state.index >= 0
@@ -259,13 +287,13 @@ export class PlotCanvasView extends BokehView
     if @can_undo()
       @state.index -= 1
       @_do_state_change(@state.index)
-      @trigger("state_changed")
+      @state_changed.emit()
 
   redo: () ->
     if @can_redo()
       @state.index += 1
       @_do_state_change(@state.index)
-      @trigger("state_changed")
+      @state_changed.emit()
 
   _do_state_change: (index) ->
     info = @state.history[index]?.info or @_initial_state_info
@@ -275,20 +303,6 @@ export class PlotCanvasView extends BokehView
 
     if info.selection?
       @update_selection(info.selection)
-
-    if info.dimensions?
-      @canvas_view.set_dims([info.dimensions.width, info.dimensions.height])
-
-  reset_dimensions: () ->
-    @update_dimensions(@canvas.initial_width, @canvas.initial_height)
-
-  update_dimensions: (width, height) ->
-    @pause()
-    @model.plot.width = width
-    @model.plot.height = height
-    @model.document.resize()
-    @unpause()
-
 
   get_selection: () ->
     selection = []
@@ -410,7 +424,7 @@ export class PlotCanvasView extends BokehView
       return weight
 
   update_range: (range_info, is_panning, is_scrolling) ->
-    @pause
+    @pause()
     if not range_info?
       for name, rng of @frame.x_ranges
         rng.reset()
@@ -444,7 +458,7 @@ export class PlotCanvasView extends BokehView
 
     for view in new_renderer_views
       @levels[view.model.level][view.model.id] = view
-      view.bind_bokeh_events()
+      view.connect_signals()
 
     return @
 
@@ -456,29 +470,19 @@ export class PlotCanvasView extends BokehView
     new_tool_views = build_views(@tool_views, tool_models, @view_options())
 
     for tool_view in new_tool_views
-      tool_view.bind_bokeh_events()
+      tool_view.connect_signals()
       @ui_event_bus.register_tool(tool_view)
 
-  bind_bokeh_events: () ->
+  connect_signals: () ->
+    super()
+    @connect(@force_paint, () => @paint())
     for name, rng of @model.frame.x_ranges
-      @listenTo(rng, 'change', @request_render)
+      @connect(rng.change, () -> @request_render())
     for name, rng of @model.frame.y_ranges
-      @listenTo(rng, 'change', @request_render)
-    @listenTo(@model.plot, 'change:renderers', () => @build_levels())
-    @listenTo(@model.plot.toolbar, 'change:tools', () => @build_levels(); @build_tools())
-    @listenTo(@model.plot, 'change', @request_render)
-    @listenTo(@model.plot, 'destroy', () => @remove())
-    @listenTo(@model.plot.document.solver(), 'layout_update', () => @request_render())
-    @listenTo(@model.plot.document.solver(), 'layout_update', () =>
-      @model.plot.setv({
-        inner_width: Math.round(@frame.width)
-        inner_height: Math.round(@frame.height)
-        layout_width: Math.round(@canvas.width)
-        layout_height: Math.round(@canvas.height)
-      })
-    )
-    @listenTo(@model.plot.document.solver(), 'resize', () => @resize())
-    @listenTo(@canvas, 'change:pixel_ratio', () => @request_render())
+      @connect(rng.change, () -> @request_render())
+    @connect(@model.plot.properties.renderers.change, () => @build_levels())
+    @connect(@model.plot.toolbar.properties.tools.change, () => @build_levels(); @build_tools())
+    @connect(@model.plot.change, () -> @request_render())
 
   set_initial_range : () ->
     # check for good values for ranges before setting initial range
@@ -505,11 +509,68 @@ export class PlotCanvasView extends BokehView
     else
       logger.warn('could not set initial ranges')
 
-  render: (force_canvas=false) ->
-    logger.trace("PlotCanvas.render(force_canvas=#{force_canvas}) for #{@model.id}")
+  update_constraints: () ->
+    @solver.suggest_value(@frame._width, @canvas._width.value)
+    @solver.suggest_value(@frame._height, @canvas._height.value)
 
-    if not @model.document?
+    for _, view of @renderer_views
+      if view.model.panel?
+        update_panel_constraints(view)
+
+    @solver.update_variables()
+
+  # XXX: bacause PlotCanvas is NOT a LayoutDOM
+  _layout: (final=false) ->
+    @render()
+
+    if final
+      @model.plot.setv({
+        inner_width: Math.round(@frame._width.value)
+        inner_height: Math.round(@frame._height.value)
+        layout_width: Math.round(@canvas._width.value)
+        layout_height: Math.round(@canvas._height.value)
+      }, {no_change: true})
+
+      @request_paint()
+
+  has_finished: () ->
+    if not super()
+      return false
+
+    for _, renderer_views of @levels
+      for _, view of renderer_views
+        if not view.has_finished()
+          return false
+
+    return true
+
+  render: () ->
+    # Set the plot and canvas to the current model's size
+    # This gets called upon solver resize events
+    width = @model._width.value
+    height = @model._height.value
+
+    @canvas_view.set_dims([width, height])
+    @update_constraints()
+    if @model.plot.match_aspect != false and @frame._width.value != 0 and @frame._height.value != 0
+      @update_dataranges()
+
+    # This allows the plot canvas to be positioned around the toolbar
+    @el.style.position = 'absolute'
+    @el.style.left     = "#{@model._dom_left.value}px"
+    @el.style.top      = "#{@model._dom_top.value}px"
+    @el.style.width    = "#{@model._width.value}px"
+    @el.style.height   = "#{@model._height.value}px"
+
+  paint: () ->
+    if @is_paused
       return
+
+    logger.trace("PlotCanvas.render() for #{@model.id}")
+
+    # Prepare the canvas size, taking HIDPI into account. Note that this may cause a resize
+    # of the canvas, which means that any previous calls to ctx.save() will be undone.
+    @canvas_view.prepare_canvas()
 
     if Date.now() - @interactive_timestamp < @model.plot.lod_interval
       if not @lod_started
@@ -534,15 +595,14 @@ export class PlotCanvasView extends BokehView
         @update_dataranges()
         break
 
-    # AK: seems weird to me that this is here, but get solver errors if I remove it
-    @update_constraints()
-
     # TODO (bev) OK this sucks, but the event from the solver update doesn't
     # reach the frame in time (sometimes) so force an update here for now
-    @model.frame._update_mappers()
+    # (mp) not only that, but models don't know about solver anymore, so
+    # frame can't update its scales.
+    @model.frame._update_scales()
 
     ctx = @canvas_view.ctx
-    ctx.pixel_ratio = ratio = @canvas_view.pixel_ratio  # Also store on cts for WebGL
+    ctx.pixel_ratio = ratio = @canvas.pixel_ratio  # Also store on cts for WebGL
 
     # Set hidpi-transform
     ctx.save()  # Save default state, do *after* getting ratio, cause setting canvas.width resets transforms
@@ -550,10 +610,10 @@ export class PlotCanvasView extends BokehView
     ctx.translate(0.5, 0.5)
 
     frame_box = [
-      @canvas.vx_to_sx(@frame.left),
-      @canvas.vy_to_sy(@frame.top),
-      @frame.width,
-      @frame.height,
+      @canvas.vx_to_sx(@frame._left.value),
+      @canvas.vy_to_sy(@frame._top.value),
+      @frame._width.value,
+      @frame._height.value,
     ]
 
     @_map_hook(ctx, frame_box)
@@ -564,73 +624,37 @@ export class PlotCanvasView extends BokehView
     ctx.save()
     if @visuals.outline_line.doit
       @visuals.outline_line.set_value(ctx)
-      ctx.strokeRect.apply(ctx, frame_box)
+      [x0, y0, w, h] = frame_box
+      # XXX: shrink outline region by 1px to make right and bottom lines visible
+      # if they are on the edge of the canvas.
+      if x0 + w == @canvas._width.value
+        w -= 1
+      if y0 + h == @canvas._height.value
+        h -= 1
+      ctx.strokeRect(x0, y0, w, h)
     ctx.restore()
 
-    @_render_levels(ctx, ['image', 'underlay', 'glyph'], frame_box)
+    @_paint_levels(ctx, ['image', 'underlay', 'glyph'], frame_box)
     @blit_webgl(ratio)
-    @_render_levels(ctx, ['annotation'], frame_box)
-    @_render_levels(ctx, ['overlay'])
+    @_paint_levels(ctx, ['annotation'], frame_box)
+    @_paint_levels(ctx, ['overlay'])
 
     if not @initial_range_info?
       @set_initial_range()
 
     ctx.restore()  # Restore to default state
 
-    # Invoke a resize on the document the first time that all plots of that
-    # document are rendered. For some reason, the layout solver only works well
-    # after the plots have been rendered. See #4401.
-    if @model.document._unrendered_plots?
-      delete @model.document._unrendered_plots[@id]
-      if isEmpty(@model.document._unrendered_plots)
-        @model.document._unrendered_plots = null
-        defer(@model.document.resize.bind(@model.document))
+    if not @_has_finished
+      @_has_finished = true
+      @notify_finished()
 
-    event = new Event("bokeh:rendered", {detail: @})
-    window.dispatchEvent(event)
-
-  resize: () ->
-    # Set the plot and canvas to the current model's size
-    # This gets called upon solver resize events
-    width = @model._width._value
-    height = @model._height._value
-
-    @canvas_view.set_dims([width, height], true)  # this indirectly calls @request_render
-
-    # Prepare the canvas size, taking HIDPI into account. Note that this may cause
-    # a resize of the canvas, which means that any previous calls to ctx.save() may be undone.
-    @canvas_view.prepare_canvas()
-
-    @update_constraints()
-
-    # This allows the plot canvas to be positioned around the toolbar
-    @el.style.position = 'absolute'
-    @el.style.left = "#{@model._dom_left._value}px"
-    @el.style.top = "#{@model._dom_top._value}px"
-    @el.style.width = "#{@model._width._value}px"
-    @el.style.height = "#{@model._height._value}px"
-
-  update_constraints: () ->
-    s = @model.document.solver()
-
-    # Note: -1 to effectively dilate the canvas by 1px
-    s.suggest_value(@frame._width, @canvas.width - 1)
-    s.suggest_value(@frame._height, @canvas.height - 1)
-
-    for model_id, view of @renderer_views
-      if view.model.panel?
-        update_panel_constraints(view)
-
-    s.update_variables(false)
-
-  _render_levels: (ctx, levels, clip_region) ->
+  _paint_levels: (ctx, levels, clip_region) ->
     ctx.save()
 
-    if clip_region?
+    if clip_region? and @model.plot.output_backend == "canvas"
       ctx.beginPath()
       ctx.rect.apply(ctx, clip_region)
       ctx.clip()
-      ctx.beginPath()
 
     indices = {}
     for renderer, i in @model.plot.renderers
@@ -649,27 +673,50 @@ export class PlotCanvasView extends BokehView
   _map_hook: (ctx, frame_box) ->
 
   _paint_empty: (ctx, frame_box) ->
-    ctx.clearRect(0, 0,  @canvas_view.model.width, @canvas_view.model.height)
+    ctx.clearRect(0, 0,  @canvas_view.model._width.value, @canvas_view.model._height.value)
     if @visuals.border_fill.doit
       @visuals.border_fill.set_value(ctx)
-      ctx.fillRect(0, 0,  @canvas_view.model.width, @canvas_view.model.height)
+      ctx.fillRect(0, 0,  @canvas_view.model._width.value, @canvas_view.model._height.value)
       ctx.clearRect(frame_box...)
     if @visuals.background_fill.doit
       @visuals.background_fill.set_value(ctx)
       ctx.fillRect(frame_box...)
 
   save: (name) ->
-    canvas = @get_canvas_element()
+    if @model.plot.output_backend in ["canvas", "webgl"]
+      canvas = @canvas_view.get_canvas_element()
+      if canvas.msToBlob?
+        blob = canvas.msToBlob()
+        window.navigator.msSaveBlob(blob, name)
+      else
+        link = document.createElement('a')
+        link.href = canvas.toDataURL('image/png')
+        link.download = name + ".png"
+        link.target = "_blank"
+        link.dispatchEvent(new MouseEvent('click'))
+    else if @model.plot.output_backend == "svg"
+      svg = @canvas_view.ctx.getSerializedSvg(true)
+      svgblob = new Blob([svg], {type:'text/plain'})
+      downloadLink = document.createElement("a")
+      downloadLink.download =  name + ".svg"
+      downloadLink.innerHTML = "Download svg"
+      downloadLink.href = window.URL.createObjectURL(svgblob)
+      downloadLink.onclick = (event) -> document.body.removeChild(event.target)
+      downloadLink.style.display = "none"
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
 
-    if canvas.msToBlob?
-      blob = canvas.msToBlob()
-      window.navigator.msSaveBlob(blob, name)
-    else
-      link = document.createElement('a')
-      link.href = canvas.toDataURL('image/png')
-      link.download = name
-      link.target = "_blank"
-      link.dispatchEvent(new MouseEvent('click'))
+class AbovePanel extends LayoutCanvas
+  type: "AbovePanel"
+
+class BelowPanel extends LayoutCanvas
+  type: "BelowPanel"
+
+class LeftPanel extends LayoutCanvas
+  type: "LeftPanel"
+
+class RightPanel extends LayoutCanvas
+  type: "RightPanel"
 
 export class PlotCanvas extends LayoutDOM
   type: 'PlotCanvas'
@@ -682,38 +729,25 @@ export class PlotCanvas extends LayoutDOM
       map: @use_map ? false
       initial_width: @plot.plot_width,
       initial_height: @plot.plot_height,
-      use_hidpi: @plot.hidpi
+      use_hidpi: @plot.hidpi,
+      output_backend: @plot.output_backend
     })
 
     @frame = new CartesianFrame({
       x_range: @plot.x_range,
       extra_x_ranges: @plot.extra_x_ranges,
-      x_mapper_type: @plot.x_mapper_type,
+      x_scale: @plot.x_scale,
       y_range: @plot.y_range,
       extra_y_ranges: @plot.extra_y_ranges,
-      y_mapper_type: @plot.y_mapper_type,
+      y_scale: @plot.y_scale
     })
 
-    @above_panel = new LayoutCanvas()
-    @below_panel = new LayoutCanvas()
-    @left_panel = new LayoutCanvas()
-    @right_panel = new LayoutCanvas()
+    @above_panel = new AbovePanel()
+    @below_panel = new BelowPanel()
+    @left_panel  = new LeftPanel()
+    @right_panel = new RightPanel()
 
     logger.debug("PlotCanvas initialized")
-
-  add_renderer_to_canvas_side: (renderer, side) ->
-    # Calling this method after a plot has been initialized may (will?)
-    # fail because the new constraints from the panel may
-    # not be added to the solver.
-    #
-    # TODO (bird): We could make it more formal that in order for
-    # a renderer to be available as an off-center item, it needs an add_panel
-    # method. Currently axis and annotation have these.
-    #
-    # TODO (bird): Should we actually just throw an error if you try
-    # to call this for a center renderer to help with clarity.
-    if side != 'center'
-      renderer.add_panel(side)
 
   _doc_attached: () ->
     @canvas.attach_document(@document)
@@ -722,6 +756,7 @@ export class PlotCanvas extends LayoutDOM
     @below_panel.attach_document(@document)
     @left_panel.attach_document(@document)
     @right_panel.attach_document(@document)
+    super()
     logger.debug("PlotCanvas attached to document")
 
   @override {
@@ -755,85 +790,95 @@ export class PlotCanvas extends LayoutDOM
 
     return children
 
-  get_edit_variables: () ->
-    edit_variables = []
-    # Go down the children to pick up any more constraints
-    for child in @get_layoutable_children()
-      edit_variables = edit_variables.concat(child.get_edit_variables())
-    return edit_variables
-
   get_constraints: () ->
-    constraints = super()
-    constraints = constraints.concat(@_get_constant_constraints())
-    constraints = constraints.concat(@_get_side_constraints())
-    # Go down the children to pick up any more constraints
-    for child in @get_layoutable_children()
-      constraints = constraints.concat(child.get_constraints())
-    return constraints
+    return super().concat(@_get_constant_constraints(), @_get_side_constraints())
 
   _get_constant_constraints: () ->
-    min_border_top    = @plot.min_border_top
-    min_border_bottom = @plot.min_border_bottom
-    min_border_left   = @plot.min_border_left
-    min_border_right  = @plot.min_border_right
-
     # Create the constraints that always apply for a plot
-    constraints = []
+    return [
+      GE( @above_panel._height, -@plot.min_border_top    ),
+      GE( @below_panel._height, -@plot.min_border_bottom ),
+      GE( @left_panel._width,   -@plot.min_border_left   ),
+      GE( @right_panel._width,  -@plot.min_border_right  ),
 
-    # Set the border constraints
-    constraints.push(GE( @above_panel._height, -min_border_top    ))
-    constraints.push(GE( @below_panel._height, -min_border_bottom ))
-    constraints.push(GE( @left_panel._width,   -min_border_left   ))
-    constraints.push(GE( @right_panel._width,  -min_border_right  ))
+      EQ( @above_panel._top,    [-1, @canvas._top]         ),
+      EQ( @above_panel._bottom, [-1, @frame._top]          ),
+      EQ( @above_panel._left,   [-1, @left_panel._right]   ),
+      EQ( @above_panel._right,  [-1, @right_panel._left]   ),
 
-    # Set panel top and bottom related to canvas and frame
-    constraints.push(EQ( @above_panel._top,    [-1, @canvas._top]    ))
-    constraints.push(EQ( @above_panel._bottom, [-1, @frame._top]     ))
-    constraints.push(EQ( @below_panel._bottom, [-1, @canvas._bottom] ))
-    constraints.push(EQ( @below_panel._top,    [-1, @frame._bottom]  ))
-    constraints.push(EQ( @left_panel._left,    [-1, @canvas._left]   ))
-    constraints.push(EQ( @left_panel._right,   [-1, @frame._left]    ))
-    constraints.push(EQ( @right_panel._right,  [-1, @canvas._right]  ))
-    constraints.push(EQ( @right_panel._left,   [-1, @frame._right]   ))
+      EQ( @below_panel._top,    [-1, @frame._bottom]       ),
+      EQ( @below_panel._bottom, [-1, @canvas._bottom]      ),
+      EQ( @below_panel._left,   [-1, @left_panel._right]   ),
+      EQ( @below_panel._right,  [-1, @right_panel._left]   ),
 
-    # Plot sides align
-    constraints.push(EQ( @above_panel._height, [-1, @_top]                         ))
-    constraints.push(EQ( @above_panel._height, [-1, @canvas._top], @frame._top     ))
-    constraints.push(EQ( @below_panel._height, [-1, @_height], @_bottom            ))
-    constraints.push(EQ( @below_panel._height, [-1, @frame._bottom]                ))
-    constraints.push(EQ( @left_panel._width,   [-1, @_left]                        ))
-    constraints.push(EQ( @left_panel._width,   [-1, @frame._left]                  ))
-    constraints.push(EQ( @right_panel._width,  [-1, @_width], @_right              ))
-    constraints.push(EQ( @right_panel._width,  [-1, @canvas._right], @frame._right ))
+      EQ( @left_panel._top,    [-1, @above_panel._bottom]  ),
+      EQ( @left_panel._bottom, [-1, @below_panel._top]     ),
+      EQ( @left_panel._left,   [-1, @canvas._left]         ),
+      EQ( @left_panel._right,  [-1, @frame._left]          ),
 
-    return constraints
+      EQ( @right_panel._top,    [-1, @above_panel._bottom] ),
+      EQ( @right_panel._bottom, [-1, @below_panel._top]    ),
+      EQ( @right_panel._left,   [-1, @frame._right]        ),
+      EQ( @right_panel._right,  [-1, @canvas._right]       ),
+
+      EQ(@_top,                    [-1, @above_panel._height] ),
+      EQ(@_left,                   [-1, @left_panel._width]   ),
+      EQ(@_height, [-1, @_bottom], [-1, @below_panel._height] ),
+      EQ(@_width, [-1, @_right],   [-1, @right_panel._width]  ),
+    ]
 
   _get_side_constraints: () ->
     constraints = []
-    sides = [['above', @plot.above], ['below', @plot.below],
-             ['left', @plot.left], ['right', @plot.right]]
-    for [side, layout_renderers] in sides
-      last = @frame
-      for r in layout_renderers
-        # Stack together the renderers
-        constraint = switch side
-          when "above" then EQ(last.panel._top, [-1, r.panel._bottom])
-          when "below" then EQ(last.panel._bottom, [-1, r.panel._top])
-          when "left"  then EQ(last.panel._left, [-1, r.panel._right])
-          when "right" then EQ(last.panel._right, [-1, r.panel._left])
-        constraints.push(constraint)
-        last = r
-      if layout_renderers.length != 0
-        # Set panel extent to match the side renderers (e.g. axes)
-        constraint = switch side
-          when "above" then EQ(last.panel._top, [-1, @above_panel._top])
-          when "below" then EQ(last.panel._bottom, [-1, @below_panel._bottom])
-          when "left"  then EQ(last.panel._left, [-1, @left_panel._left])
-          when "right" then EQ(last.panel._right, [-1, @right_panel._right])
-        constraints.push(constraint)
-    return constraints
 
-  # TODO: This is less than awesome - this is here purely for tests to pass. Need to
-  # find a better way, but this was expedient for now.
-  plot_canvas: () ->
-    return @
+    add = (new_constraints...) ->
+      constraints.push(new_constraints...)
+
+    above = @plot.above
+    below = @plot.below
+    left  = @plot.left
+    right = @plot.right
+
+    head = (arr) -> arr[0]
+    tail = (arr) -> arr[arr.length-1]
+
+    if above.length > 0
+      add(EQ(head(above).panel._bottom, [-1, @above_panel._bottom]))
+      add(LE(tail(above).panel._top,    [-1, @above_panel._top]))
+
+      add(pairwise(above, (prev, next) -> EQ(prev.panel._top,    [-1, next.panel._bottom]))...)
+
+      for obj in above
+        add(EQ(obj.panel._left,  [-1, @above_panel._left]))
+        add(EQ(obj.panel._right, [-1, @above_panel._right]))
+
+    if below.length > 0
+      add(EQ(head(below).panel._top,    [-1, @below_panel._top]))
+      add(GE(tail(below).panel._bottom, [-1, @below_panel._bottom]))
+
+      add(pairwise(below, (prev, next) -> EQ(prev.panel._bottom, [-1, next.panel._top]))...)
+
+      for obj in below
+        add(EQ(obj.panel._left,  [-1, @below_panel._left]))
+        add(EQ(obj.panel._right, [-1, @below_panel._right]))
+
+    if left.length > 0
+      add(EQ(head(left) .panel._right,  [-1, @left_panel._right]))
+      add(GE(tail(left) .panel._left,   [-1, @left_panel._left]))
+
+      add(pairwise(left,  (prev, next) -> EQ(prev.panel._left,   [-1, next.panel._right]))...)
+
+      for obj in left
+        add(EQ(obj.panel._top,    [-1, @left_panel._top]))
+        add(EQ(obj.panel._bottom, [-1, @left_panel._bottom]))
+
+    if right.length > 0
+      add(EQ(head(right).panel._left,   [-1, @right_panel._left]))
+      add(LE(tail(right).panel._right,  [-1, @right_panel._right]))
+
+      add(pairwise(right, (prev, next) -> EQ(prev.panel._right,  [-1, next.panel._left]))...)
+
+      for obj in right
+        add(EQ(obj.panel._top,    [-1, @right_panel._top]))
+        add(EQ(obj.panel._bottom, [-1, @right_panel._bottom]))
+
+    return constraints

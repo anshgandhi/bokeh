@@ -37,7 +37,7 @@ this.
 
     <div>
     <iframe
-        src="http://demo.bokehplots.com/apps/sliders/#"
+        src="https://demo.bokehplots.com/apps/sliders/#"
         frameborder="0"
         style="overflow:hidden;height:400px;width: 90%;
 
@@ -339,7 +339,7 @@ In this case you might have code similar to:
     from os.path import dirname, join
     from helpers import load_data
 
-    load_data(join(dirname(__file__), 'data', 'things.csv')
+    load_data(join(dirname(__file__), 'data', 'things.csv'))
 
 And similar code to load the JavaScript implementation for a custom model
 from ``models/custom.js``
@@ -352,9 +352,9 @@ Accessing the HTTP Request
 When a session is created for a Bokeh application, the session context is made
 available as ``curdoc().session_context``. The most useful function of the
 session context is to make the Tornado HTTP request object available to the
-application as ``session_context.request``. The request object has a number of
-fields, such as ``arguments``, ``cookies``, ``protocol``, etc. See the
-documentation for `HTTPServerRequest`_ for full details.
+application as ``session_context.request``. Due to an incompatibility issue with
+the usage of ``--num-procs`` only the ``arguments`` attribute can be accessed.
+Attempting to access any other attribute on ``request`` will result in an error.
 
 As an example, the following code will access the request ``arguments`` to set
 a value for a variable ``N`` (perhaps controlling the number of points in a
@@ -392,7 +392,7 @@ JavaScript Callbacks in the Browser
 
 Regardless of whether there is a Bokeh Server involved, it is possible to
 create callbacks that execute in the browser, using ``CustomJS`` and other
-methods. See :ref:`userguide_interaction_actions_customjs` for more detailed
+methods. See :ref:`userguide_interaction_jscallbacks` for more detailed
 information and examples.
 
 It is critical to note that **no python code is ever executed when a CustomJS
@@ -1255,7 +1255,7 @@ in :ref:`devguide_server`
 
 .. _Ansible: http://www.ansible.com
 .. _Chef: https://www.chef.io/chef/
-.. _contact us on the mailing list: https://groups.google.com/a/continuum.io/forum/#!forum/bokeh
+.. _contact us on the mailing list: https://groups.google.com/a/anaconda.com/forum/#!forum/bokeh
 .. _demo.bokehplots.com: https://demo.bokehplots.com
 .. _HTTPServerRequest: http://www.tornadoweb.org/en/stable/httputil.html#tornado.httputil.HTTPServerRequest
 .. _Puppet: https://puppetlabs.com

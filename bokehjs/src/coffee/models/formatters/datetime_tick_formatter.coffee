@@ -1,4 +1,4 @@
-import * as SPrintf from "sprintf"
+import {sprintf} from "sprintf-js"
 import * as tz from "timezone"
 
 import {TickFormatter} from "./tick_formatter"
@@ -26,7 +26,7 @@ _strftime = (t, format) ->
     # supported by the javascript library timezone: http://bigeasy.github.io/timezone/.
     # Use a regular expression to replace %f directive with microseconds.
     # TODO: what should we do for negative microsecond strings?
-    microsecond_replacement_string = SPrintf.sprintf("$1%06d", _us(t))
+    microsecond_replacement_string = sprintf("$1%06d", _us(t))
     format = format.replace(/((^|[^%])(%%)*)%f/, microsecond_replacement_string)
 
     if format.indexOf("%") == -1
@@ -109,7 +109,7 @@ export class DatetimeTickFormatter extends TickFormatter
       else                                  "years"
 
   # TODO (bev) remove these unused "default" params and associated logic
-  doFormat: (ticks, loc, num_labels=null, char_width=null, fill_ratio=0.3, ticker=null) ->
+  doFormat: (ticks, axis, num_labels=null, char_width=null, fill_ratio=0.3, ticker=null) ->
 
     # In order to pick the right set of labels, we need to determine
     # the resolution of the ticks.  We can do this using a ticker if

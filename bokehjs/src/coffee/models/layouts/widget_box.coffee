@@ -1,56 +1,47 @@
-import {build_views} from "core/build_views"
-import {BokehView} from "core/bokeh_view"
-import {WEAK_EQ, GE, EQ, Strength, Variable} from "core/layout/solver"
 import {logger} from "core/logging"
 import * as p from "core/properties"
 import {extend} from "core/util/object"
 
 import {LayoutDOM, LayoutDOMView} from "../layouts/layout_dom"
 
-
 export class WidgetBoxView extends LayoutDOMView
   className: "bk-widget-box"
 
-  initialize: (options) ->
-    super(options)
-    @render()
-
-  bind_bokeh_events: () ->
+  connect_signals: () ->
     super()
-    @listenTo(@model, 'change:children', () => @build_child_views())
+    @connect(@model.properties.children.change, () => @rebuild_child_views())
 
   render: () ->
+    @_render_classes() # XXX: because no super()
 
-    s = @model.document.solver()
-
-    if @model.sizing_mode is 'fixed' or @model.sizing_mode == 'scale_height'
+    if @model.sizing_mode == 'fixed' or @model.sizing_mode == 'scale_height'
       width = @get_width()
-      if @model._width._value != width
-        s.suggest_value(@model._width, width)
-        s.update_variables()
+      if @model._width.value != width
+        @solver.suggest_value(@model._width, width)
 
     if @model.sizing_mode == 'fixed' or @model.sizing_mode == 'scale_width'
       height = @get_height()
-      if @model._height._value != height
-        s.suggest_value(@model._height, height)
-        s.update_variables()
+      if @model._height.value != height
+        @solver.suggest_value(@model._height, height)
 
-    if @model._width._value - 20 > 0
-      css_width = "#{@model._width._value - 20}px"
-    else
-      css_width = "100%"
+    @solver.update_variables()
 
-    if @model.sizing_mode is 'stretch_both'
+    if @model.sizing_mode == 'stretch_both'
       @el.style.position = 'absolute'
-      @el.style.left = "#{@model._dom_left._value}px"
-      @el.style.top = "#{@model._dom_top._value}px"
-      @el.style.width = "#{@model._width._value}px"
-      @el.style.height = "#{@model._height._value}px"
+      @el.style.left = "#{@model._dom_left.value}px"
+      @el.style.top = "#{@model._dom_top.value}px"
+      @el.style.width = "#{@model._width.value}px"
+      @el.style.height = "#{@model._height.value}px"
     else
       # Note we DO NOT want to set a height (except in stretch_both). Widgets
       # are happier sizing themselves. We've tried to tell the layout what
       # the height is with the suggest_value. But that doesn't mean we need
       # to put it in the dom.
+      if @model._width.value - 20 > 0
+        css_width = "#{@model._width.value - 20}px"
+      else
+        css_width = "100%"
+
       @el.style.width = css_width
 
   get_height: () ->
@@ -72,7 +63,6 @@ export class WidgetBoxView extends LayoutDOMView
           width = child_width
       return width
 
-
 export class WidgetBox extends LayoutDOM
   type: 'WidgetBox'
   default_view: WidgetBoxView
@@ -86,46 +76,30 @@ export class WidgetBox extends LayoutDOM
     if @sizing_mode == 'scale_height'
       logger.warn("sizing_mode `scale_height` is not experimental for WidgetBox. Please report your results to the bokeh dev team so we can improve.")
 
-  get_edit_variables: () ->
-    edit_variables = super()
-    # Go down the children to pick up any more constraints
-    for child in @get_layoutable_children()
-      edit_variables = edit_variables.concat(child.get_edit_variables())
-    return edit_variables
-
-  get_constraints: () ->
-    constraints = super()
-    # Go down the children to pick up any more constraints
-    for child in @get_layoutable_children()
-      constraints = constraints.concat(child.get_constraints())
-    return constraints
-
   get_constrained_variables: () ->
-    constrained_variables = super()
-    constrained_variables = extend(constrained_variables, {
-      'on-edge-align-top'    : @_top
-      'on-edge-align-bottom' : @_height_minus_bottom
-      'on-edge-align-left'   : @_left
-      'on-edge-align-right'  : @_width_minus_right
+    vars = extend({}, super(), {
+      on_edge_align_top    : @_top
+      on_edge_align_bottom : @_height_minus_bottom
+      on_edge_align_left   : @_left
+      on_edge_align_right  : @_width_minus_right
 
-      'box-cell-align-top'   : @_top
-      'box-cell-align-bottom': @_height_minus_bottom
-      'box-cell-align-left'  : @_left
-      'box-cell-align-right' : @_width_minus_right
+      box_cell_align_top   : @_top
+      box_cell_align_bottom: @_height_minus_bottom
+      box_cell_align_left  : @_left
+      box_cell_align_right : @_width_minus_right
 
-      'box-equal-size-top'   : @_top
-      'box-equal-size-bottom': @_height_minus_bottom
+      box_equal_size_top   : @_top
+      box_equal_size_bottom: @_height_minus_bottom
     })
-    if @sizing_mode isnt 'fixed'
-      constrained_variables = extend(constrained_variables, {
-        'box-equal-size-left'  : @_left
-        'box-equal-size-right' : @_width_minus_right
-      })
-    return constrained_variables
 
-  get_layoutable_children: () ->
-    return @children
+    if @sizing_mode != 'fixed'
+      vars.box_equal_size_left  = @_left
+      vars.box_equal_size_right = @_width_minus_right
+
+    return vars
+
+  get_layoutable_children: () -> @children
 
   @define {
-    'children': [ p.Array, [] ]
+    children: [ p.Array, [] ]
   }

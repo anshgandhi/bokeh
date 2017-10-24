@@ -1,14 +1,12 @@
 from __future__ import absolute_import
 
-from mock import Mock
-
 import bokeh.util.compiler as buc
+
+from mock import patch
 
 def test_nodejs_compile_coffeescript():
     assert buc.nodejs_compile("""(a, b) -> a + b""", "coffeescript", "some.coffee") == \
         dict(code="""\
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
 (function (a, b) {
     return a + b;
 });
@@ -16,8 +14,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 
     assert buc.nodejs_compile("""some = require 'some/module'""", "coffeescript", "some.coffee") == \
         dict(code="""\
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
 var some;
 some = require('some/module');
 """, deps=["some/module"])
@@ -53,16 +49,12 @@ some = require('some/module');
 def test_nodejs_compile_javascript():
     assert buc.nodejs_compile("""function f(a, b) { return a + b; };""", "javascript", "some.js") == \
         dict(code="""\
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
 function f(a, b) { return a + b; }
 ;
 """, deps=[])
 
     assert buc.nodejs_compile("""var some = require('some/module');""", "javascript", "some.js") == \
         dict(code="""\
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
 var some = require('some/module');
 """, deps=["some/module"])
 
@@ -86,10 +78,63 @@ def test_nodejs_compile_less():
             extract=".bk-some-style color: green; }",
             annotated="some.less:1:21:Unrecognised input\n  .bk-some-style color: green; }"))
 
-def test__detect_nodejs_calls_wait():
-    m = Mock()
-    old_Popen = buc.Popen
-    buc.Popen = lambda *args, **kw: m
-    buc._detect_nodejs()
-    assert m.wait.called
-    buc.Popen = old_Popen
+def test_Implementation():
+    obj = buc.Implementation()
+    assert obj.file == None
+
+def test_Inline():
+    obj = buc.Inline("code")
+    assert obj.code == "code"
+    assert obj.file == None
+
+    obj = buc.Inline("code", "file")
+    assert obj.code == "code"
+    assert obj.file == "file"
+
+def test_CoffeeScript():
+    obj = buc.CoffeeScript("code")
+    assert isinstance(obj, buc.Inline)
+    assert obj.code == "code"
+    assert obj.file == None
+    assert obj.lang == "coffeescript"
+
+def test_TypeScript():
+    obj = buc.TypeScript("code")
+    assert isinstance(obj, buc.Inline)
+    assert obj.code == "code"
+    assert obj.file == None
+    assert obj.lang == "typescript"
+
+def test_JavaScript():
+    obj = buc.JavaScript("code")
+    assert isinstance(obj, buc.Inline)
+    assert obj.code == "code"
+    assert obj.file == None
+    assert obj.lang == "javascript"
+
+def test_Less():
+    obj = buc.Less("code")
+    assert isinstance(obj, buc.Inline)
+    assert obj.code == "code"
+    assert obj.file == None
+    assert obj.lang == "less"
+
+@patch('io.open')
+def test_FromFile(mock_open):
+    obj = buc.FromFile("path.coffee")
+    assert obj.lang == "coffeescript"
+
+    obj = buc.FromFile("path.ts")
+    assert obj.lang == "typescript"
+
+    obj = buc.FromFile("path.js")
+    assert obj.lang == "javascript"
+
+    obj = buc.FromFile("path.css")
+    assert obj.lang == "less"
+
+    obj = buc.FromFile("path.less")
+    assert obj.lang == "less"
+
+def test_exts():
+    assert buc.exts == (".coffee", ".ts", ".tsx", ".js", ".css", ".less")

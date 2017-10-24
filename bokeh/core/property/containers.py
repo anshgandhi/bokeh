@@ -45,6 +45,10 @@ The classes in this module provide this functionality.
 
 '''
 from __future__ import absolute_import, print_function
+from ...util.dependencies import import_optional
+
+pd = import_optional('pandas')
+
 
 def notify_owner(func):
     ''' A decorator for mutating methods of property container classes
@@ -93,15 +97,15 @@ class PropertyValueContainer(object):
         self._owners = set()
         super(PropertyValueContainer, self).__init__(*args, **kwargs)
 
-    def _register_owner(self, owner, prop):
-        self._owners.add((owner, prop))
+    def _register_owner(self, owner, descriptor):
+        self._owners.add((owner, descriptor))
 
-    def _unregister_owner(self, owner, prop):
-        self._owners.discard((owner, prop))
+    def _unregister_owner(self, owner, descriptor):
+        self._owners.discard((owner, descriptor))
 
     def _notify_owners(self, old, hint=None):
-        for (owner, prop) in self._owners:
-            prop._notify_mutated(owner, old, hint)
+        for (owner, descriptor) in self._owners:
+            descriptor._notify_mutated(owner, old, hint=hint)
 
     def _saved_copy(self):
         raise RuntimeError("Subtypes must implement this to make a backup copy")
@@ -290,6 +294,56 @@ class PropertyValueDict(PropertyValueContainer, dict):
     def update(self, *args, **kwargs):
         return super(PropertyValueDict, self).update(*args, **kwargs)
 
+class PropertyValueColumnData(PropertyValueDict):
+    ''' A property value container for ColumnData that supports change
+    notifications on mutating operations.
+
+    This property value container affords specialized code paths for
+    updating the .data dictionary for ColumnDataSource. When possible,
+    more efficient ColumnDataChangedEvent hints are generated to perform
+    the updates:
+
+    .. code-block:: python
+
+        x[i] = y
+        x.update
+
+    '''
+
+    # x[i] = y
+    # don't wrap with notify_owner --- notifies owners explicitly
+    def __setitem__(self, i, y):
+        return self.update([(i, y)])
+
+    # don't wrap with notify_owner --- notifies owners explicitly
+    def update(self, *args, **kwargs):
+        old = self._saved_copy()
+
+        result = super(PropertyValueDict, self).update(*args, **kwargs)
+
+        from ...document.events import ColumnDataChangedEvent
+
+        # Grab keys to update according to  Python docstring for update([E, ]**F)
+        #
+        # If E is present and has a .keys() method, then does:  for k in E: D[k] = E[k]
+        # If E is present and lacks a .keys() method, then does:  for k, v in E: D[k] = v
+        # In either case, this is followed by: for k in F:  D[k] = F[k]
+        cols = set(kwargs.keys())
+        if len(args) == 1:
+            E = args[0]
+            if hasattr(E, 'keys'):
+                cols |= set(E.keys())
+            else:
+                cols |= { x[0] for x in E }
+
+        # we must loop ourselves here instead of calling _notify_owners
+        # because the hint is customized for each owner separately
+        for (owner, descriptor) in self._owners:
+            hint = ColumnDataChangedEvent(owner.document, owner, cols=list(cols))
+            descriptor._notify_mutated(owner, old, hint=hint)
+
+        return result
+
     # don't wrap with notify_owner --- notifies owners explicitly
     def _stream(self, doc, source, new_data, rollover=None, setter=None):
         ''' Internal implementation to handle special-casing stream events
@@ -320,11 +374,17 @@ class PropertyValueDict(PropertyValueContainer, dict):
 
         import numpy as np
 
+        # pandas/issues/13918
+        if pd and isinstance(new_data, pd.DataFrame):
+            new_items = new_data.iteritems()
+        else:
+            new_items = new_data.items()
+
         # TODO (bev) Currently this reports old differently for array vs list
         # For arrays is reports the actual old value. For lists, the old value
         # is actually the already updated value. This is because the method
         # self._saved_copy() makes a shallow copy.
-        for k, v in new_data.items():
+        for k, v in new_items:
             if isinstance(self[k], np.ndarray):
                 data = np.append(self[k], new_data[k])
                 if rollover and len(data) > rollover:
@@ -336,7 +396,7 @@ class PropertyValueDict(PropertyValueContainer, dict):
                 if rollover is not None:
                     del L[:-rollover]
 
-        from ...server.events import ColumnsStreamedEvent
+        from ...document.events import ColumnsStreamedEvent
 
         self._notify_owners(old,
                             hint=ColumnsStreamedEvent(doc, source, new_data, rollover, setter))
@@ -363,17 +423,22 @@ class PropertyValueDict(PropertyValueContainer, dict):
         synchronize.
 
         .. warning::
-            This function assumes the integrity of ``new_data`` has already
+            This function assumes the integrity of ``patches`` has already
             been verified.
 
         '''
+        import numpy as np
         old = self._saved_copy()
 
         for name, patch in patches.items():
             for ind, value in patch:
-                self[name][ind] = value
+                if isinstance(ind, (int, slice)):
+                    self[name][ind] = value
+                else:
+                    shape = self[name][ind[0]][ind[1:]].shape
+                    self[name][ind[0]][ind[1:]] = np.array(value, copy=False).reshape(shape)
 
-        from ...server.events import ColumnsPatchedEvent
+        from ...document.events import ColumnsPatchedEvent
 
         self._notify_owners(old,
                             hint=ColumnsPatchedEvent(doc, source, patches, setter))

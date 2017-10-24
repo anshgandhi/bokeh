@@ -30,6 +30,10 @@ class Settings(object):
     def _is_dev(self):
         return self._get_bool("DEV", False)
 
+    @property
+    def dev(self):
+        return self._is_dev
+
     def _dev_or_default(self, default, dev):
         return dev if dev is not None and self._is_dev else default
 
@@ -116,7 +120,8 @@ class Settings(object):
 
         '''
         level = self._get_str("PY_LOG_LEVEL", default, "debug")
-        LEVELS = {'debug': logging.DEBUG,
+        LEVELS = {'trace': logging.TRACE,
+                  'debug': logging.DEBUG,
                   'info' : logging.INFO,
                   'warn' : logging.WARNING,
                   'error': logging.ERROR,
@@ -171,6 +176,12 @@ class Settings(object):
         '''
         return self._get_bool("SIGN_SESSIONS", default)
 
+    def perform_document_validation(self, default=True):
+        ''' Set whether Bokeh should perform validation checks on documents.
+
+        '''
+        return self._get_bool("VALIDATE_DOC", default)
+
     # Server settings go here:
 
     def bokehjssrcdir(self):
@@ -200,7 +211,7 @@ class Settings(object):
         js_files = []
         for root, dirnames, files in os.walk(bokehjsdir):
             for fname in files:
-                if fname.endswith(".js") and 'vendor' not in root:
+                if fname.endswith(".js"):
                     js_files.append(join(root, fname))
         return js_files
 
@@ -212,12 +223,15 @@ class Settings(object):
         js_files = []
         for root, dirnames, files in os.walk(bokehjsdir):
             for fname in files:
-                if fname.endswith(".css") and 'vendor' not in root:
+                if fname.endswith(".css"):
                     js_files.append(join(root, fname))
         return js_files
 
     def nodejs_path(self, default=None):
         return self._get_str("NODEJS_PATH", default)
+
+    def phantomjs_path(self, default=None):
+        return self._get_str("PHANTOMJS_PATH", default)
 
 #: A global settings object that other parts of Bokeh can refer to.
 #:
@@ -304,6 +318,7 @@ class Settings(object):
 #:
 #:   As in the JS side, valid values are, in order of increasing severity:
 #:
+#:   - ``trace``
 #:   - ``debug``
 #:   - ``info``
 #:   - ``warn``

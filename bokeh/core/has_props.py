@@ -11,7 +11,7 @@ serializable properties.
 from __future__ import absolute_import
 
 import logging
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 import difflib
 import inspect
@@ -27,16 +27,6 @@ from ..util.string import nice_join
 from .property.containers import PropertyValueContainer
 from .property.descriptor_factory import PropertyDescriptorFactory
 from .property.override import Override
-
-IPython = import_optional('IPython')
-
-if IPython:
-    from IPython.lib.pretty import RepresentationPrinter
-
-    class _BokehPrettyPrinter(RepresentationPrinter):
-        def __init__(self, output, verbose=False, max_width=79, newline='\n'):
-            super(_BokehPrettyPrinter, self).__init__(output, verbose, max_width, newline)
-            self.type_pprinters[HasProps] = lambda obj, p, cycle: obj._repr_pretty(p, cycle)
 
 _ABSTRACT_ADMONITION = '''
     .. note::
@@ -62,7 +52,9 @@ def abstract(cls):
     if not issubclass(cls, HasProps):
         raise TypeError("%s is not a subclass of HasProps" % cls.__name__)
 
-    cls.__doc__ += _ABSTRACT_ADMONITION
+    # running python with -OO will discard docstrings -> __doc__ is None
+    if cls.__doc__ is not None:
+        cls.__doc__ += _ABSTRACT_ADMONITION
 
     return cls
 
@@ -141,7 +133,10 @@ class MetaHasProps(type):
 
         if "__example__" in class_dict:
             path = class_dict["__example__"]
-            class_dict["__doc__"] += _EXAMPLE_TEMPLATE % dict(path=path)
+
+            # running python with -OO will discard docstrings -> __doc__ is None
+            if "__doc__" in class_dict and class_dict["__doc__"] is not None:
+                class_dict["__doc__"] += _EXAMPLE_TEMPLATE % dict(path=path)
 
         return super(MetaHasProps, meta_cls).__new__(meta_cls, class_name, bases, class_dict)
 
@@ -331,11 +326,11 @@ class HasProps(with_metaclass(MetaHasProps, object)):
 
         '''
         if name in self.properties():
-            #logger.debug("Patching attribute %s of %r", attr, patched_obj)
+            log.trace("Patching attribute %r of %r with %r", name, self, json)
             descriptor = self.lookup(name)
             descriptor.set_from_json(self, json, models, setter)
         else:
-            logger.warn("JSON had attr %r on obj %r, which is a client-only or invalid attribute that shouldn't have been sent", name, self)
+            log.warn("JSON had attr %r on obj %r, which is a client-only or invalid attribute that shouldn't have been sent", name, self)
 
     def update(self, **kwargs):
         ''' Updates the object's properties from the given keyword arguments.
@@ -651,6 +646,16 @@ class HasProps(with_metaclass(MetaHasProps, object)):
             ValueError, if ``IPython`` cannot be imported
 
         '''
+        IPython = import_optional('IPython')
+
+        if IPython:
+            from IPython.lib.pretty import RepresentationPrinter
+
+        class _BokehPrettyPrinter(RepresentationPrinter):
+            def __init__(self, output, verbose=False, max_width=79, newline='\n'):
+                super(_BokehPrettyPrinter, self).__init__(output, verbose, max_width, newline)
+                self.type_pprinters[HasProps] = lambda obj, p, cycle: obj._repr_pretty(p, cycle)
+
         if not IPython:
             cls = self.__class__
             raise RuntimeError("%s.%s.pretty() requires IPython" % (cls.__module__, cls.__name__))

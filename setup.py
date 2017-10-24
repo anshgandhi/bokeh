@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Continuum Analytics, Inc. All rights reserved.
+# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
 #
 # Powered by the Bokeh Development Team.
 #
@@ -65,11 +65,12 @@ import sys
 
 from setuptools import find_packages, setup
 
-from _setup_support import (build_or_install_bokehjs, fixup_building_sdist,
-                            fixup_for_packaged, fixup_old_jsargs, get_cmdclass,
-                            get_package_data, get_version, install_js,
-                            package_files, package_path, ROOT, SERVER,
-                            show_bokehjs, show_help)
+from _setup_support import (
+    build_or_install_bokehjs, conda_rendering, fixup_building_sdist,
+    fixup_for_packaged, get_cmdclass, get_package_data, get_version,
+    install_js, package_files, package_path, ROOT, SERVER, show_bokehjs,
+    show_help
+)
 
 # immediately bail for ancient pythons
 if sys.version_info[:2] < (2, 7):
@@ -87,7 +88,6 @@ copy("LICENSE.txt", "bokeh/")
 # state our runtime deps here, also used by meta.yaml (so KEEP the spaces)
 REQUIRES = [
     'six >=1.5.2',
-    'requests >=1.2.3',
     'PyYAML >=3.10',
     'python-dateutil >=2.1',
     'Jinja2 >=2.7',
@@ -100,8 +100,7 @@ if sys.version_info[:2] == (2, 7):
     REQUIRES.append('futures >=3.0.3')
 
 # if this is just conda-build skimming information, skip all this actual work
-if "conda-build" not in sys.argv[0]:
-    fixup_old_jsargs()     # handle --build_js and --install_js
+if not conda_rendering():
     fixup_for_packaged()   # --build_js and --install_js not valid FROM sdist
     fixup_building_sdist() # must build BokehJS when MAKING sdists
 
@@ -109,12 +108,11 @@ if "conda-build" not in sys.argv[0]:
 
 # configuration to include all the special or non-python files in the package
 # directory that need to also be installed or included in a build
-sampledata_pats = ('.csv', '.conf', '.gz', '.json', '.png', '.ics', '.geojson')
 package_path(join(SERVER, 'static'))
 package_path(join(ROOT, 'bokeh', 'core', '_templates'))
 package_path(join(ROOT, 'bokeh', 'sphinxext', '_templates'))
 package_path(join(ROOT, 'bokeh', 'server', 'views'), ('.html'))
-package_path(join(ROOT, 'bokeh', 'sampledata'), sampledata_pats)
+package_path(join(ROOT, 'bokeh', 'sampledata', '_data'))
 package_files('LICENSE.txt', 'themes/*.yaml')
 
 setup(
@@ -124,14 +122,14 @@ setup(
     version=get_version(),
     description='Interactive plots and applications in the browser from Python',
     license='New BSD',
-    author='Continuum Analytics',
-    author_email='info@continuum.io',
+    author='Anaconda',
+    author_email='info@anaconda.com',
     url='http://github.com/bokeh/bokeh',
-    classifiers=open("classifiers.txt").read().split('\n'),
+    classifiers=open("classifiers.txt").read().strip().split('\n'),
 
     # details needed by setup
     install_requires=REQUIRES,
-    packages=find_packages(),
+    packages=find_packages(exclude=["scripts*", "tests*"]),
     package_data=get_package_data(),
     entry_points={'console_scripts': ['bokeh = bokeh.__main__:main',], },
     zip_safe=False,
@@ -140,7 +138,7 @@ setup(
 )
 
 # if this is just conda-build skimming information, skip all this actual work
-if "conda-build" not in sys.argv[0]:
+if not conda_rendering():
     if '--help'  in sys.argv: show_help(bokehjs_action)
     if 'develop' in sys.argv: show_bokehjs(bokehjs_action, develop=True)
     if 'install' in sys.argv: show_bokehjs(bokehjs_action)

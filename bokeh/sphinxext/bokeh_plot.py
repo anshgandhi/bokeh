@@ -9,6 +9,10 @@ The ``bokeh-plot`` directive can be used by either supplying:
 
     .. bokeh-plot:: path/to/plot.py
 
+.. note::
+    .py scripts are not scanned automatically! In order to include
+    certain directories into .py scanning process use following directive
+    in sphinx conf.py file: bokeh_plot_pyfile_include_dirs = ["dir1","dir2"]
 
 **Inline code** as the content of the directive::
 
@@ -63,10 +67,10 @@ The inline example code above produces the following output:
 from __future__ import absolute_import
 
 import ast
-import hashlib
 from os import getenv
 from os.path import basename, dirname, join
 import re
+from uuid import uuid4
 
 from docutils import nodes
 from docutils.parsers.rst import Directive, Parser
@@ -84,10 +88,25 @@ from ..util.string import decode_utf8
 from .example_handler import ExampleHandler
 from .templates import PLOT_PAGE
 
-if settings.docs_cdn() == "local":
-    resources = Resources(mode="server", root_url="/en/latest/")
-else:
+docs_cdn = settings.docs_cdn()
+
+# if BOKEH_DOCS_CDN is unset just use default CDN resources
+if docs_cdn is None:
     resources = Resources(mode="cdn")
+
+else:
+    # "BOKEH_DOCS_CDN=local" is used for building and displaying the docs locally
+    if docs_cdn == "local":
+        resources = Resources(mode="server", root_url="/en/latest/")
+
+    # "BOKEH_DOCS_CDN=test:newthing" is used for building and deploying test docs to
+    # a one-off location "en/newthing" on the docs site
+    elif docs_cdn.startswith("test:"):
+        resources = Resources(mode="server", root_url="/en/%s/" % docs_cdn.split(":")[1])
+
+    # Otherwise assume it is a dev/rc/full release version and use CDN for it
+    else:
+        resources = Resources(mode="cdn", version=docs_cdn)
 
 GOOGLE_API_KEY = getenv('GOOGLE_API_KEY')
 if GOOGLE_API_KEY is None:
@@ -159,7 +178,7 @@ class PlotScriptParser(Parser):
             lineno = m.body[0].lineno # assumes docstring is m.body[0]
             source = "\n".join(lines[lineno:])
 
-        js_name = "bokeh-plot-%s.js" % hashlib.md5(env.docname.encode('utf-8')).hexdigest()
+        js_name = "bokeh-plot-%s.js" % uuid4().hex
 
         (script, js, js_path, source) = _process_script(source, filename, env.bokeh_plot_auxdir, js_name)
 
@@ -200,8 +219,7 @@ class BokehPlotDirective(Directive):
             source = '\n'.join(self.content)
             # need docname not to look like a path
             docname = env.docname.replace("/", "-")
-            serialno = env.new_serialno(env.docname)
-            js_name = "bokeh-plot-%s-inline-%d.js" % (docname, serialno)
+            js_name = "bokeh-plot-%s-inline-%s.js" % (docname, uuid4().hex)
             # the code runner just needs a real path to cd to, this will do
             path = join(env.bokeh_plot_auxdir, js_name)
 
@@ -223,8 +241,7 @@ class BokehPlotDirective(Directive):
                 source = open(self.arguments[0]).read()
                 source = decode_utf8(source)
                 docname = env.docname.replace("/", "-")
-                serialno = env.new_serialno(env.docname)
-                js_name = "bokeh-plot-%s-external-%d.js" % (docname, serialno)
+                js_name = "bokeh-plot-%s-external-%s.js" % (docname, uuid4().hex)
                 (script, js, js_path, source) = _process_script(source, self.arguments[0], env.bokeh_plot_auxdir, js_name)
                 env.bokeh_plot_files[js_name] = (script, js, js_path, source)
 
@@ -249,6 +266,10 @@ class BokehPlotDirective(Directive):
 
 def env_before_read_docs(app, env, docnames):
     docnames.sort(key=lambda x: 2 if "extension" in x else 0 if "examples" in x else 1)
+    for name in [x for x in docnames if env.doc2path(x).endswith(".py")]:
+        if not name.startswith(tuple(env.app.config.bokeh_plot_pyfile_include_dirs)):
+            env.found_docs.remove(name)
+            docnames.remove(name)
 
 def builder_inited(app):
     app.env.bokeh_plot_auxdir = join(app.env.doctreedir, 'bokeh_plot')
@@ -293,6 +314,9 @@ def env_purge_doc(app, env, docname):
         del env.bokeh_plot_files[docname]
 
 def setup(app):
+    """ sphinx config variable to scan .py files in provided directories only """
+    app.add_config_value('bokeh_plot_pyfile_include_dirs', [], 'html')
+
     app.add_source_parser('.py', PlotScriptParser)
 
     app.add_directive('bokeh-plot', BokehPlotDirective)

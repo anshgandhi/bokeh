@@ -3,8 +3,6 @@
 '''
 from __future__ import absolute_import
 
-import warnings
-
 from ...core.enums import ButtonType
 from ...core.has_props import abstract, HasProps
 from ...core.properties import Bool, Enum, Instance, Int, List, Override, String, Tuple
@@ -23,26 +21,6 @@ class ButtonLike(HasProps):
     button_type = Enum(ButtonType, help="""
     A style for the button, signifying it's role.
     """)
-
-    @property
-    def type(self):
-        warnings.warn(
-            """
-            Property 'type' was deprecated in Bokeh 0.12.0
-            and will be removed. Use 'button_type' instead.
-            """)
-        return self.button_type
-
-    @type.setter
-    def type(self, type):
-        warnings.warn(
-            """
-            Property 'type' was deprecated in Bokeh 0.12.0
-            and will be removed. Use 'button_type' instead.
-            """)
-        self.button_type = type
-
-    __deprecated_attributes__ = ('type',)
 
 @abstract
 class AbstractButton(Widget, ButtonLike):
@@ -84,6 +62,10 @@ class Button(AbstractButton):
         '''
         self.on_change('clicks', lambda attr, old, new: handler())
 
+    def js_on_click(self, handler):
+        ''' Set up a JavaScript handler for button clicks. '''
+        self.js_on_change('clicks', handler)
+
 
 class Toggle(AbstractButton):
     ''' A two-state toggle button.
@@ -108,6 +90,10 @@ class Toggle(AbstractButton):
 
         """
         self.on_change('active', lambda attr, old, new: handler(new))
+
+    def js_on_click(self, handler):
+        """ Set up a JavaScript handler for button state changes (clicks). """
+        self.js_on_change('active', handler)
 
 class Dropdown(AbstractButton):
     ''' A dropdown button.
@@ -140,3 +126,7 @@ class Dropdown(AbstractButton):
 
         '''
         self.on_change('value', lambda attr, old, new: handler(new))
+
+    def js_on_click(self, handler):
+        ''' Set up a JavaScript handler for button or menu item clicks. '''
+        self.js_on_change('value', handler)

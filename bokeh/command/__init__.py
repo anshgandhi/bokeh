@@ -10,7 +10,10 @@ def _build_docstring():
     from . import subcommands
 
     for cls in subcommands.all:
-        __doc__ += "%8s : %s\n" % (cls.name, cls.help)
+        # running python with -OO will discard docstrings -> __doc__ is None
+        if __doc__ is None:
+            __doc__ = ''
+        __doc__ += "%s\n    %s\n\n" % (cls.name, cls.help)
 
 _build_docstring()
 del _build_docstring

@@ -12,6 +12,7 @@ from bokeh.models.tools import Toolbar, ToolbarBox
 def test_Toolbar():
     tb = Toolbar()
     assert tb.active_drag == 'auto'
+    assert tb.active_inspect == 'auto'
     assert tb.active_scroll == 'auto'
     assert tb.active_tap == 'auto'
 
@@ -33,7 +34,7 @@ def test_toolbar_box_properties():
     assert tb_box.merge_tools is True
 
 
-@mock.patch('bokeh.io._show_with_state')
+@mock.patch('bokeh.io.showing._show_with_state')
 def test_toolbar_box_with_no_children_does_not_raise_a_bokeh_warning(mock__show_with_state):
     # This is the normal way a ToolbarBox would be instantiated for example in
     # a gridplot. So we don't want to worry people with warnings. The children

@@ -1,17 +1,18 @@
-import {BokehView} from "core/bokeh_view"
+import {DOMView} from "core/dom_view"
 import {Visuals} from "core/visuals"
-import {logger} from "core/logging"
 import * as p from "core/properties"
 import * as proj from "core/util/projections"
 import {extend} from "core/util/object"
 import {Model} from "../../model"
 
-export class RendererView extends BokehView
+# This shouldn't be a DOMView, but annotations create a mess.
+export class RendererView extends DOMView
 
   initialize: (options) ->
     super(options)
     @plot_view = options.plot_view
     @visuals = new Visuals(@model)
+    @_has_finished = true # XXX: should be in render() but subclasses don't respect super()
 
   @getters {
     plot_model: () -> @plot_view.model

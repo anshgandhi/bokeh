@@ -4,13 +4,16 @@ import * as p from "core/properties"
 export class RayView extends XYGlyphView
 
   _map_data: () ->
-    @slength = @sdist(@renderer.xmapper, @_x, @_length)
+    if @model.properties.length.units == "data"
+      @slength = @sdist(@renderer.xscale, @_x, @_length)
+    else
+      @slength = @_length
 
   _render: (ctx, indices, {sx, sy, slength, _angle}) ->
     if @visuals.line.doit
 
-      width = @renderer.plot_view.frame.width
-      height = @renderer.plot_view.frame.height
+      width = @renderer.plot_view.frame._width.value
+      height = @renderer.plot_view.frame._height.value
       inf_len = 2 * (width + height)
       for i in [0...slength.length]
         if slength[i] == 0
@@ -43,6 +46,6 @@ export class Ray extends XYGlyph
 
   @mixins ['line']
   @define {
-      length: [ p.DistanceSpec ]
-      angle:  [ p.AngleSpec    ]
-    }
+    length: [ p.DistanceSpec ]
+    angle:  [ p.AngleSpec    ]
+  }

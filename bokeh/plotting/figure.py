@@ -5,28 +5,33 @@ logger = logging.getLogger(__name__)
 
 from six import string_types
 
-from ..core.properties import Auto, Either, Enum, Float, Int, Seq, Instance, String, Tuple
+from ..core.properties import Any, Auto, Either, Enum, Int, Seq, Instance, String
 from ..core.enums import HorizontalLocation, VerticalLocation
-from ..models import Plot, Range, Title, Tool
+from ..models import Plot, Title, Tool, GraphRenderer
 from ..models import glyphs, markers
+from ..models.tools import Drag, Inspection, Scroll, Tap
 from ..util.options import Options
+from ..util.string import format_docstring
 from ..util._plot_arg_helpers import _convert_responsive
-from .helpers import _get_range, _process_axis_and_grid, _process_tools_arg, _glyph_function, _process_active_tools
+from .helpers import (
+    _get_range, _get_scale, _process_axis_and_grid, _process_tools_arg,
+    _glyph_function, _process_active_tools, _stack, _graph)
 
 DEFAULT_TOOLS = "pan,wheel_zoom,box_zoom,save,reset,help"
 
-
+# This class itself is intentionally undocumented (it is used to generate
+# documentation elsewhere)
 class FigureOptions(Options):
 
     tools = Either(String, Seq(Either(String, Instance(Tool))), default=DEFAULT_TOOLS, help="""
     Tools the plot should start with.
     """)
 
-    x_range = Either(Tuple(Float, Float), Seq(String), Instance(Range), help="""
+    x_range = Any(help="""
     Customize the x-range of the plot.
     """)
 
-    y_range = Either(Tuple(Float, Float), Seq(String), Instance(Range), help="""
+    y_range = Any(help="""
     Customize the x-range of the plot.
     """)
 
@@ -54,15 +59,19 @@ class FigureOptions(Options):
     A label for the y-axis.
     """)
 
-    active_drag = Either(Auto, String, Instance(Tool), default="auto", help="""
+    active_drag = Either(Auto, String, Instance(Drag), default="auto", help="""
     Which drag tool should initially be active.
     """)
 
-    active_scroll = Either(Auto, String, Instance(Tool), default="auto", help="""
+    active_inspect = Either(Auto, String, Instance(Inspection), Seq(Instance(Inspection)), default="auto", help="""
+    Which drag tool should initially be active.
+    """)
+
+    active_scroll = Either(Auto, String, Instance(Scroll), default="auto", help="""
     Which scroll tool should initially be active.
     """)
 
-    active_tap = Either(Auto, String, Instance(Tool), default="auto", help="""
+    active_tap = Either(Auto, String, Instance(Tap), default="auto", help="""
     Which tap tool should initially be active.
     """)
 
@@ -77,6 +86,19 @@ class FigureOptions(Options):
 class Figure(Plot):
     ''' A subclass of :class:`~bokeh.models.plots.Plot` that simplifies plot
     creation with default axes, grids, tools, etc.
+
+    Figure objects have many glyph methods that can be used to draw
+    vectorized graphical glyphs:
+
+    .. hlist::
+        :columns: 3
+
+{glyph_methods}
+
+    There are also two specialized methods for stacking bars:
+    :func:`~bokeh.plotting.figure.Figure.hbar_stack` and
+    :func:`~bokeh.plotting.figure.Figure.vbar_stack`
+
 
     In addition to all the Bokeh model property attributes documented below,
     the ``Figure`` initializer also accepts the following options, which can
@@ -118,12 +140,15 @@ class Figure(Plot):
         self.x_range = _get_range(opts.x_range)
         self.y_range = _get_range(opts.y_range)
 
+        self.x_scale = _get_scale(self.x_range, opts.x_axis_type)
+        self.y_scale = _get_scale(self.y_range, opts.y_axis_type)
+
         _process_axis_and_grid(self, opts.x_axis_type, opts.x_axis_location, opts.x_minor_ticks, opts.x_axis_label, self.x_range, 0)
         _process_axis_and_grid(self, opts.y_axis_type, opts.y_axis_location, opts.y_minor_ticks, opts.y_axis_label, self.y_range, 1)
 
         tool_objs, tool_map = _process_tools_arg(self, opts.tools)
         self.add_tools(*tool_objs)
-        _process_active_tools(self.toolbar, tool_map, opts.active_drag, opts.active_scroll, opts.active_tap)
+        _process_active_tools(self.toolbar, tool_map, opts.active_drag, opts.active_inspect, opts.active_scroll, opts.active_tap)
 
     annular_wedge = _glyph_function(glyphs.AnnularWedge)
 
@@ -403,7 +428,7 @@ Examples:
 
        p = figure(plot_width=300, plot_height=300)
        p.patches(xs=[[1,2,3],[4,5,6,5]], ys=[[1,2,1],[4,5,5,4]],
-                color=["#43a2ca", "#a8ddb5"])
+                 color=["#43a2ca", "#a8ddb5"])
 
        show(p)
 
@@ -419,7 +444,7 @@ Examples:
 
         plot = figure(plot_width=300, plot_height=300)
         plot.quad(top=[2, 3, 4], bottom=[1, 2, 3], left=[1, 2, 3],
-            right=[1.2, 2.5, 3.7], color="#B3DE69")
+                  right=[1.2, 2.5, 3.7], color="#B3DE69")
 
         show(plot)
 
@@ -453,11 +478,27 @@ Examples:
 
         plot = figure(plot_width=300, plot_height=300)
         plot.rect(x=[1, 2, 3], y=[1, 2, 3], width=10, height=20, color="#CAB2D6",
-            width_units="screen", height_units="screen")
+                  width_units="screen", height_units="screen")
 
         show(plot)
 
 """)
+
+    step = _glyph_function(glyphs.Step, """
+Examples:
+
+    .. bokeh-plot::
+        :source-position: above
+
+        from bokeh.plotting import figure, output_file, show
+
+        plot = figure(plot_width=300, plot_height=300)
+        plot.step(x=[1, 2, 3, 4, 5], y=[1, 2, 3, 2, 5], color="#FB8072")
+
+        show(plot)
+
+""")
+
 
     segment = _glyph_function(glyphs.Segment, """
 Examples:
@@ -469,8 +510,8 @@ Examples:
 
         plot = figure(plot_width=300, plot_height=300)
         plot.segment(x0=[1, 2, 3], y0=[1, 2, 3], x1=[1, 2, 3],
-                    y1=[1.2, 2.5, 3.7], color="#F4A582",
-                    line_width=3)
+                     y1=[1.2, 2.5, 3.7], color="#F4A582",
+                     line_width=3)
 
         show(plot)
 
@@ -501,7 +542,7 @@ Examples:
 
         plot = figure(plot_width=300, plot_height=300)
         plot.square_cross(x=[1, 2, 3], y=[1, 2, 3], size=[10,20,25],
-                         color="#7FC97F",fill_color=None, line_width=2)
+                          color="#7FC97F",fill_color=None, line_width=2)
 
         show(plot)
 
@@ -517,7 +558,7 @@ Examples:
 
         plot = figure(plot_width=300, plot_height=300)
         plot.square_x(x=[1, 2, 3], y=[1, 2, 3], size=[10,20,25],
-                     color="#FDAE6B",fill_color=None, line_width=2)
+                      color="#FDAE6B",fill_color=None, line_width=2)
 
         show(plot)
 
@@ -543,7 +584,7 @@ Examples:
 
         plot = figure(plot_width=300, plot_height=300)
         plot.triangle(x=[1, 2, 3], y=[1, 2, 3], size=[10,20,25],
-                     color="#99D594", line_width=2)
+                      color="#99D594", line_width=2)
 
         show(plot)
 
@@ -574,7 +615,7 @@ Examples:
 
         plot = figure(plot_width=300, plot_height=300)
         plot.wedge(x=[1, 2, 3], y=[1, 2, 3], radius=15, start_angle=0.6,
-                     end_angle=4.1, radius_units="screen", color="#2b8cbe")
+                   end_angle=4.1, radius_units="screen", color="#2b8cbe")
 
         show(plot)
 
@@ -594,6 +635,8 @@ Examples:
         show(plot)
 
 """)
+
+    # -------------------------------------------------------------------------
 
     def scatter(self, *args, **kwargs):
         """ Creates a scatter plot of the given x and y items.
@@ -633,9 +676,107 @@ Examples:
 
         return getattr(self, markertype)(*args, **kwargs)
 
+    def hbar_stack(self, stackers, **kw):
+        ''' Generate multiple ``HBar`` renderers for levels stacked left to right.
+
+        Args:
+            stackers (seq[str]) : a list of data source field names to stack
+                successively for ``left`` and ``right`` bar coordinates.
+
+        Any additional keyword arguments are passed to each call to ``hbar``.
+        If a keyword value is a list or tuple, then each call will get one
+        value from the sequence.
+
+        Examples:
+
+            Assuming a ``ColumnDataSource`` named ``source`` with columns
+            *2106* and *2017*, then the following call to ``hbar_stack`` will
+            will create two ``HBar`` renderers that stack:
+
+            .. code-block:: python
+
+                p.hbar_stack(['2016', '2017'], x=10, width=0.9, color=['blue', 'red'], source=source)
+
+            This is equivalent to the following two separate calls:
+
+            .. code-block:: python
+
+                p.hbar(bottom=stack(),       top=stack('2016'),         x=10, width=0.9, color='blue', source=source)
+                p.hbar(bottom=stack('2016'), top=stack('2016', '2017'), x=10, width=0.9, color='red', source=source)
+
+        '''
+        for kw in _stack(stackers, "left", "right", **kw):
+            self.hbar(**kw)
+
+    def vbar_stack(self, stackers, **kw):
+        ''' Generate multiple ``VBar`` renderers for levels stacked bottom
+        to top.
+
+        Args:
+            stackers (seq[str]) : a list of data source field names to stack
+                successively for ``left`` and ``right`` bar coordinates.
+
+        Any additional keyword arguments are passed to each call to ``vbar``.
+        If a keyword value is a list or tuple, then each call will get one
+        value from the sequence.
+
+        Examples:
+
+            Assuming a ``ColumnDataSource`` named ``source`` with columns
+            *2106* and *2017*, then the following call to ``vbar_stack`` will
+            will create two ``VBar`` renderers that stack:
+
+            .. code-block:: python
+
+                p.vbar_stack(['2016', '2017'], x=10, width=0.9, color=['blue', 'red'], source=source)
+
+            This is equivalent to the following two separate calls:
+
+            .. code-block:: python
+
+                p.vbar(bottom=stack(),       top=stack('2016'),         x=10, width=0.9, color='blue', source=source)
+                p.vbar(bottom=stack('2016'), top=stack('2016', '2017'), x=10, width=0.9, color='red', source=source)
+
+
+        '''
+        for kw in _stack(stackers, "bottom", "top", **kw):
+            self.vbar(**kw)
+
+    def graph(self, node_source, edge_source, layout_provider, **kwargs):
+        ''' Creates a network graph using the given node, edge and layout provider.
+
+        Args:
+            node_source (:class:`~bokeh.models.sources.ColumnDataSource`) : a user-supplied data source
+                for the graph nodes. An attempt will be made to convert the object to
+                :class:`~bokeh.models.sources.ColumnDataSource` if needed. If none is supplied, one is created
+                for the user automatically.
+            edge_source (:class:`~bokeh.models.sources.ColumnDataSource`) : a user-supplied data source
+                for the graph edges. An attempt will be made to convert the object to
+                :class:`~bokeh.models.sources.ColumnDataSource` if needed. If none is supplied, one is created
+                for the user automatically.
+            layout_provider (:class:`~bokeh.models.graphs.LayoutProvider`) : a LayoutProvider instance to
+                provide the graph coordinates in Cartesian space.
+            **kwargs: :ref:`userguide_styling_line_properties` and :ref:`userguide_styling_fill_properties`
+        '''
+        kw = _graph(node_source, edge_source, **kwargs)
+        graph_renderer = GraphRenderer(layout_provider=layout_provider, **kw)
+        self.renderers.append(graph_renderer)
+        return graph_renderer
 
 def figure(**kwargs):
     ''' Create a new :class:`~bokeh.plotting.figure.Figure` for plotting.
+
+    Figure objects have many glyph methods that can be used to draw
+    vectorized graphical glyphs:
+
+    .. hlist::
+        :columns: 3
+
+{glyph_methods}
+
+    There are also two specialized methods for stacking bars:
+    :func:`~bokeh.plotting.figure.Figure.hbar_stack` and
+    :func:`~bokeh.plotting.figure.Figure.vbar_stack`
 
     In addition to the standard :class:`~bokeh.plotting.figure.Figure`
     property values (e.g. ``plot_width`` or ``sizing_mode``) the following
@@ -683,3 +824,8 @@ def markers():
 
 _color_fields = set(["color", "fill_color", "line_color"])
 _alpha_fields = set(["alpha", "fill_alpha", "line_alpha"])
+
+_gms = sorted(x for x in dir(Figure) if getattr(getattr(Figure, x), 'glyph_method', False))
+_gms = "\n".join("        * :func:`~bokeh.plotting.figure.Figure.%s`" % x for x in _gms)
+Figure.__doc__ = format_docstring(Figure.__doc__, glyph_methods=_gms)
+figure.__doc__ = format_docstring(figure.__doc__, glyph_methods=_gms)

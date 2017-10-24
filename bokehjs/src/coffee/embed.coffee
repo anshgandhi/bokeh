@@ -1,30 +1,27 @@
-import {Promise} from "es6-promise"
-
 import * as base from "./base"
-import {pull_session} from "./client"
+import {pull_session} from "./client/connection"
 import {logger, set_log_level} from "./core/logging"
 import {Document, RootAddedEvent, RootRemovedEvent, TitleChangedEvent} from "./document"
 import {div, link, style, replaceWith} from "./core/dom"
-import {delay} from "./core/util/callback"
+import {Receiver} from "./protocol/receiver"
 
 # Matches Bokeh CSS class selector. Setting all Bokeh parent element class names
 # with this var prevents user configurations where css styling is unset.
 export BOKEH_ROOT = "bk-root"
 
-_handle_notebook_comms = (msg) ->
-  logger.debug("handling notebook comms")
-  # @ is bound to the doc
-  data = JSON.parse(msg.content.data)
-  if 'events' of data and 'references' of data
-    @apply_json_patch(data)
-  else if 'doc' of data
-    @replace_with_json(data['doc'])
+_handle_notebook_comms = (receiver, msg) ->
+  if msg.buffers.length > 0
+    receiver.consume(msg.buffers[0].buffer)
   else
-    throw new Error("handling notebook comms message: ", msg)
+    receiver.consume(msg.content.data)
+  msg = receiver.message
+  if msg?
+    @apply_json_patch(msg.content, msg.buffers)
 
 _update_comms_callback = (target, doc, comm) ->
   if target == comm.target_name
-    comm.on_msg(_handle_notebook_comms.bind(doc))
+    r = new Receiver()
+    comm.on_msg(_handle_notebook_comms.bind(doc, r))
 
 _init_comms = (target, doc) ->
   if Jupyter? and Jupyter.notebook.kernel?
@@ -36,7 +33,8 @@ _init_comms = (target, doc) ->
     try
       comm_manager.register_target(target, (comm, msg) ->
         logger.info("Registering Jupyter comms for target #{target}")
-        comm.on_msg(_handle_notebook_comms.bind(doc))
+        r = new Receiver()
+        comm.on_msg(_handle_notebook_comms.bind(doc, r))
       )
     catch e
       logger.warn("Jupyter comms failed to register. push_notebook() will not function. (exception reported: #{e})")
@@ -44,7 +42,7 @@ _init_comms = (target, doc) ->
     console.warn('Jupyter notebooks comms not available. push_notebook() will not function');
 
 _create_view = (model) ->
-  view = new model.default_view({model : model})
+  view = new model.default_view({model: model, parent: null})
   base.index[model.id] = view
   view
 
@@ -55,8 +53,8 @@ _render_document_to_element = (element, document, use_for_title) ->
   views = {}
   render_model = (model) ->
     view = _create_view(model)
+    view.renderTo(element)
     views[model.id] = view
-    element.appendChild(view.el)
   unrender_model = (model) ->
     if model.id of views
       view = views[model.id]
@@ -86,11 +84,11 @@ add_model_static = (element, model_id, doc) ->
   if not model?
     throw new Error("Model #{model_id} was not in document #{doc}")
   view = _create_view(model)
-  delay(-> replaceWith(element, view.el))
+  view.renderTo(element, true)
 
 # Fill element with the roots from doc
 export add_document_static = (element, doc, use_for_title) ->
-  delay(-> _render_document_to_element(element, doc, use_for_title))
+  _render_document_to_element(element, doc, use_for_title)
 
 export add_document_standalone = (document, element, use_for_title=false) ->
   return _render_document_to_element(element, document, use_for_title)
@@ -98,7 +96,7 @@ export add_document_standalone = (document, element, use_for_title=false) ->
 # map { websocket url to map { session id to promise of ClientSession } }
 _sessions = {}
 _get_session = (websocket_url, session_id, args_string) ->
-  if not websocket_url? or websocket_url == null
+  if not websocket_url?
     throw new Error("Missing websocket_url")
   if websocket_url not of _sessions
     _sessions[websocket_url] = {}
@@ -130,7 +128,7 @@ add_model_from_session = (element, websocket_url, model_id, session_id) ->
       if not model?
         throw new Error("Did not find model #{model_id} in session")
       view = _create_view(model)
-      replaceWith(element, view.el)
+      view.renderTo(element, true)
     (error) ->
       logger.error("Failed to load Bokeh session " + session_id + ": " + error)
       throw error
@@ -170,7 +168,8 @@ export embed_items = (docs_json, render_items, app_path, absolute_url) ->
     protocol = 'wss:'
 
   if absolute_url?
-    loc = new URL(absolute_url)
+    loc = document.createElement('a')
+    loc.href = absolute_url
   else
     loc = window.location
 

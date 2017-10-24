@@ -35,6 +35,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
     'bokeh.sphinxext.bokeh_autodoc',
+    'bokeh.sphinxext.bokeh_color',
     'bokeh.sphinxext.bokeh_enum',
     'bokeh.sphinxext.bokeh_gallery',
     'bokeh.sphinxext.bokeh_github',
@@ -50,6 +51,8 @@ extensions = [
     'bokeh.sphinxext.collapsible_code_block',
 ]
 
+napoleon_include_init_with_doc = True
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -64,7 +67,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Bokeh'
-copyright = '© Copyright 2015, Continuum Analytics.'
+copyright = '© Copyright 2015, Anaconda.'
 
 # Get the standard computed Bokeh version string to use for |version|
 # and |release|
@@ -99,8 +102,9 @@ all_versions = [x.strip() for x in reversed(f.readlines())]
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 #
-# NOTE: in these docs all .py script are assumed to be bokeh plot scripts
-exclude_patterns = ['conf.py']
+# NOTE: in these docs all .py script are assumed to be bokeh plot scripts!
+# with bokeh_plot_pyfile_include_dirs set desired folder to look for .py files
+bokeh_plot_pyfile_include_dirs = ['docs']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
@@ -151,7 +155,7 @@ html_theme_path = ['.']
 MAIN_SITE = '//bokehplots.com'
 
 html_context = {
-    'SITEMAP_BASE_URL': 'http://bokeh.pydata.org/en/', # Trailing slash is needed
+    'SITEMAP_BASE_URL': 'https://bokeh.pydata.org/en/', # Trailing slash is needed
     'DESCRIPTION': 'Bokeh visualization library, documentation site.',
     'AUTHOR': 'Bokeh contributors',
     'VERSION': version,
@@ -178,7 +182,7 @@ html_context = {
     # Social links
     'SOCIAL': (
         ('Contribute', MAIN_SITE + '/pages/contribute.html'),
-        ('Mailing list', '//groups.google.com/a/continuum.io/forum/#!forum/bokeh'),
+        ('Mailing list', '//groups.google.com/a/anaconda.com/forum/#!forum/bokeh'),
         ('Github', '//github.com/bokeh/bokeh'),
         ('Twitter', '//twitter.com/BokehPlots'),
         ('YouTube', '//www.youtube.com/channel/UCK0rSk29mmg4UT4bIOvPYhw')
@@ -218,7 +222,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-    ('index', 'Bokeh.tex', u'Bokeh Documentation', u'Continuum Analytics', 'manual'),
+    ('index', 'Bokeh.tex', u'Bokeh Documentation', u'Anaconda', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -248,7 +252,7 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'bokeh', u'Bokeh Documentation',
-     [u'Continuum Analytics'], 1)
+     [u'Anaconda'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -261,7 +265,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    ('index', 'Bokeh', u'Bokeh Documentation', u'Continuum Analytics', 'Bokeh', 'Interactive Web Plotting for Python', 'Graphics'),
+    ('index', 'Bokeh', u'Bokeh Documentation', u'Anaconda', 'Bokeh', 'Interactive Web Plotting for Python', 'Graphics'),
 ]
 
 # Documents to append as an appendix to all manuals.

@@ -1,4 +1,5 @@
 import {DataSource} from "./data_source"
+import {Signal} from "core/signaling"
 import {logger} from "core/logging"
 import {SelectionManager} from "core/selection_manager"
 import * as p from "core/properties"
@@ -18,6 +19,15 @@ export class ColumnarDataSource extends DataSource
     inspected:         [ p.Any ]
     _shapes:      [ p.Any, {}]
   }
+
+  initialize: (options) ->
+    super(options)
+
+    @select = new Signal(this, "select")
+    @inspect = new Signal(this, "inspect") # XXX: <[indices, tool, renderer-view, source, data], this>
+
+    @streaming = new Signal(this, "streaming")
+    @patching = new Signal(this, "patching") # <number[], ColumnarDataSource>
 
   get_column: (colname) ->
     return @data[colname] ? null
@@ -41,3 +51,8 @@ export class ColumnarDataSource extends DataSource
           return lengths.sort()[0]
         else
           throw new Error(msg)
+
+  get_indices: () ->
+    length = @get_length()
+    length = 1 if not length?
+    return [0...length]

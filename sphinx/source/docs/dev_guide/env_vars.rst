@@ -32,31 +32,44 @@ Accepted values are ``yes``/``no``, ``true``/``false`` or ``0``/``1``.
 
 ``BOKEH_DOCS_CDN``
 --------------------
-What version of BokehJS to use when building sphinx docs locally.
+What version of BokehJS to use when building sphinx docs.
 
-.. note::
-    Set to ``"local"`` to use a locally built dev version of BokehJS.
+To build and display the docs using a locally built BokehJS, set to ``local``.
+For example:
 
-    This variable is only used when building documentation from the
-    development version.
+.. code-block:: sh
+
+    BOKEH_DOCS_CDN=local make clean serve
+
+Will build a fresh copy of the docs using the locally built BokehJS and open
+a new browser tab to view hem.
+
+To build test docs to deploy to a one-off location on the docs site, set to
+``test:<location>``. For example:
+
+.. code-block:: sh
+
+    BOKEH_DOCS_CDN=test:newthing make clean
+
+will build docs that can be deployed with ``fab deploy:newthing``.
+
+Otherwise, the value is interpreted a version for CDN:
+
+.. code-block:: sh
+
+    BOKEH_DOCS_CDN=0.12.7rc1 make clean
+
+will build docs that use BokehJS version ``0.12.7rc1`` from CDN (whether viewed
+locally or deployed to the docs site).
 
 ``BOKEH_DOCS_VERSION``
 ~~~~~~~~~~~~~~~~~~~~~~
-What version of Bokeh to show when building sphinx docs locally. Useful for re-deployment purposes.
-
-.. note::
-    Set to ``"local"`` to use a locally built dev version of BokehJS.
-
-    This variable is only used when building documentation from the
-    development version.
+What version of Bokeh to show when building sphinx docs locally. Useful if it
+is necessay to re-deploy old docs with hotfixes.
 
 ``BOKEH_DOCS_CSS_SERVER``
 -------------------------
-Where to get the css stylesheet from, by default this will be bokehplots.com
-
-.. note::
-    This variable is only used when building documentation from the
-    development version.
+Where to get the CSS stylesheet from, by default this will be bokehplots.com
 
 ``BOKEH_LOG_LEVEL``
 -------------------
@@ -90,6 +103,7 @@ Accepted values are ``yes``/``no``, ``true``/``false`` or ``0``/``1``.
 The Python logging level to set
 As in the JS side, valid values are, in order of increasing severity:
 
+  - ``trace``
   - ``debug``
   - ``info``
   - ``warn``
@@ -118,6 +132,13 @@ Accepted values are ``yes``/``no``, ``true``/``false`` or ``0``/``1``.
 Normally Bokeh generates UUIDs for object identifiers. Setting this variable
 to an affirmative value will result in more friendly simple numeric IDs
 counting up from 1000.
+
+``BOKEH_VALIDATE_DOC``
+-----------------------
+Whether to perform a validation check on the document before outputting.
+Accepted values are ``yes``/``no``, ``true``/``false`` or ``0``/``1``.
+Setting this variable to a negative value for a document that is known to be
+correctly configured may yield performance improvements.
 
 ``BOKEH_VERSION``
 -----------------

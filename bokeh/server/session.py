@@ -37,6 +37,9 @@ def _needs_document_lock(func):
         # from being discarded. This avoids potential weirdness
         # with the session vanishing in the middle of some async
         # task.
+        if self.destroyed:
+            log.debug("Ignoring locked callback on already-destroyed session.")
+            raise gen.Return(None)
         self.block_expiration()
         try:
             with (yield self._lock.acquire()):
@@ -173,13 +176,12 @@ class ServerSession(object):
         if self._pending_writes is None:
             raise RuntimeError("_pending_writes should be non-None when we have a document lock, and we should have the lock when the document changes")
 
-        # TODO (havocp): our "change sync" protocol is flawed
-        # because if both sides change the same attribute at the
-        # same time, they will each end up with the state of the
-        # other and their final states will differ.
+        # TODO (havocp): our "change sync" protocol is flawed because if both
+        # sides change the same attribute at the same time, they will each end
+        # up with the state of the other and their final states will differ.
         for connection in self._subscribed_connections:
             if may_suppress and connection is self._current_patch_connection:
-                pass #log.debug("Not sending notification back to client %r for a change it requested", connection)
+                log.trace("Not sending notification back to client %r for a change it requested", connection)
             else:
                 self._pending_writes.append(connection.send_patch_document(event))
 

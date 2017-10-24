@@ -4,6 +4,7 @@ from collections import Iterable, OrderedDict, Sequence
 import difflib
 import itertools
 import re
+import textwrap
 import warnings
 
 import numpy as np
@@ -15,15 +16,159 @@ from ..models import (
     TapTool, CrosshairTool, DataRange1d, DatetimeAxis,
     FactorRange, Grid, HelpTool, HoverTool, LassoSelectTool, Legend, LegendItem, LinearAxis,
     LogAxis, PanTool, ZoomInTool, ZoomOutTool, PolySelectTool, ContinuousTicker,
-    SaveTool, Range, Range1d, UndoTool, RedoTool, ResetTool, ResizeTool, Tool,
-    WheelPanTool, WheelZoomTool, ColumnarDataSource, ColumnDataSource, GlyphRenderer)
+    SaveTool, Range, Range1d, UndoTool, RedoTool, ResetTool, Tool,
+    WheelPanTool, WheelZoomTool, ColumnarDataSource, ColumnDataSource,
+    LogScale, LinearScale, CategoricalScale, Circle, MultiLine)
+from ..models.renderers import GlyphRenderer
 
 from ..core.properties import ColorSpec, Datetime, value, field
-from ..util.deprecation import deprecated
+from ..transform import stack
+from ..util.dependencies import import_optional
 from ..util.string import nice_join
 
-DEFAULT_PALETTE = ["#f22c40", "#5ab738", "#407ee7", "#df5320", "#00ad9c", "#c33ff3"]
+pd = import_optional('pandas')
 
+
+def _stack(stackers, spec0, spec1, **kw):
+    for name in (spec0, spec1):
+        if name in kw:
+            raise ValueError("Stack property '%s' cannot appear in keyword args" % name)
+
+    lengths = { len(x) for x in kw.values() if isinstance(x, (list, tuple)) }
+
+    # lengths will be empty if there are no kwargs supplied at all
+    if len(lengths) > 0:
+        if len(lengths) != 1:
+            raise ValueError("Keyword argument sequences for broadcasting must all be the same lengths. Got lengths: %r" % sorted(list(lengths)))
+        if lengths.pop() != len(stackers):
+            raise ValueError("Keyword argument sequences for broadcasting must be the same length as stackers")
+
+    s0 = []
+    s1 = []
+
+    _kw = []
+
+    for i, val in enumerate(stackers):
+        d  = {}
+        s0 = list(s1)
+        s1.append(val)
+
+        d[spec0] = stack(*s0)
+        d[spec1] = stack(*s1)
+
+        for k, v in kw.items():
+            if isinstance(v, (list, tuple)):
+                d[k] = v[i]
+            else:
+                d[k] = v
+
+        _kw.append(d)
+
+    return _kw
+
+def _graph(node_source, edge_source, **kwargs):
+
+    if not isinstance(node_source, ColumnarDataSource):
+        try:
+            # try converting the soruce to ColumnDataSource
+            node_source = ColumnDataSource(node_source)
+        except ValueError as err:
+            msg = "Failed to auto-convert {curr_type} to ColumnDataSource.\n Original error: {err}".format(
+                curr_type=str(type(node_source)),
+                err=err.message
+            )
+            reraise(ValueError, ValueError(msg), sys.exc_info()[2])
+
+    if not isinstance(edge_source, ColumnarDataSource):
+        try:
+            # try converting the soruce to ColumnDataSource
+            edge_source = ColumnDataSource(edge_source)
+        except ValueError as err:
+            msg = "Failed to auto-convert {curr_type} to ColumnDataSource.\n Original error: {err}".format(
+                curr_type=str(type(edge_source)),
+                err=err.message
+            )
+            reraise(ValueError, ValueError(msg), sys.exc_info()[2])
+
+    ## node stuff
+    if any(x.startswith('node_selection_') for x in kwargs):
+        snode_ca = _pop_colors_and_alpha(Circle, kwargs, prefix="node_selection_")
+    else:
+        snode_ca = None
+
+    if any(x.startswith('node_hover_') for x in kwargs):
+        hnode_ca = _pop_colors_and_alpha(Circle, kwargs, prefix="node_hover_")
+    else:
+        hnode_ca = None
+
+    if any(x.startswith('node_muted_') for x in kwargs):
+        mnode_ca = _pop_colors_and_alpha(Circle, kwargs, prefix="node_muted_")
+    else:
+        mnode_ca = None
+
+    nsnode_ca = _pop_colors_and_alpha(Circle, kwargs, prefix="node_nonselection_")
+    node_ca = _pop_colors_and_alpha(Circle, kwargs, prefix="node_")
+
+    ## edge stuff
+    if any(x.startswith('edge_selection_') for x in kwargs):
+        sedge_ca = _pop_colors_and_alpha(MultiLine, kwargs, prefix="edge_selection_")
+    else:
+        sedge_ca = None
+
+    if any(x.startswith('edge_hover_') for x in kwargs):
+        hedge_ca = _pop_colors_and_alpha(MultiLine, kwargs, prefix="edge_hover_")
+    else:
+        hedge_ca = None
+
+    if any(x.startswith('edge_muted_') for x in kwargs):
+        medge_ca = _pop_colors_and_alpha(MultiLine, kwargs, prefix="edge_muted_")
+    else:
+        medge_ca = None
+
+    nsedge_ca = _pop_colors_and_alpha(MultiLine, kwargs, prefix="edge_nonselection_")
+    edge_ca = _pop_colors_and_alpha(MultiLine, kwargs, prefix="edge_")
+
+    ## node stuff
+    node_kwargs = {k.lstrip('node_'): v for k, v in kwargs.copy().items() if k.lstrip('node_') in Circle.properties()}
+
+    node_glyph = _make_glyph(Circle, node_kwargs, node_ca)
+    nsnode_glyph = _make_glyph(Circle, node_kwargs, nsnode_ca)
+    snode_glyph = _make_glyph(Circle, node_kwargs, snode_ca)
+    hnode_glyph = _make_glyph(Circle, node_kwargs, hnode_ca)
+    mnode_glyph = _make_glyph(Circle, node_kwargs, mnode_ca)
+
+    node_renderer = GlyphRenderer(glyph=node_glyph,
+                                  nonselection_glyph=nsnode_glyph,
+                                  selection_glyph=snode_glyph,
+                                  hover_glyph=hnode_glyph,
+                                  muted_glyph=mnode_glyph,
+                                  data_source=node_source)
+
+    ## edge stuff
+    edge_kwargs = {k.lstrip('edge_'): v for k, v in kwargs.copy().items() if k.lstrip('edge_') in MultiLine.properties()}
+
+    edge_glyph = _make_glyph(MultiLine, edge_kwargs, edge_ca)
+    nsedge_glyph = _make_glyph(MultiLine, edge_kwargs, nsedge_ca)
+    sedge_glyph = _make_glyph(MultiLine, edge_kwargs, sedge_ca)
+    hedge_glyph = _make_glyph(MultiLine, edge_kwargs, hedge_ca)
+    medge_glyph = _make_glyph(MultiLine, edge_kwargs, medge_ca)
+
+    edge_renderer = GlyphRenderer(glyph=edge_glyph,
+                                  nonselection_glyph=nsedge_glyph,
+                                  selection_glyph=sedge_glyph,
+                                  hover_glyph=hedge_glyph,
+                                  muted_glyph=medge_glyph,
+                                  data_source=edge_source)
+
+    _RENDERER_ARGS = ['name', 'level', 'visible', 'x_range_name', 'y_range_name',
+                      'selection_policy', 'inspection_policy']
+
+    renderer_kwargs = {attr: kwargs.pop(attr) for attr in _RENDERER_ARGS if attr in kwargs}
+
+    renderer_kwargs["node_renderer"] = node_renderer
+    renderer_kwargs["edge_renderer"] = edge_renderer
+
+    return renderer_kwargs
 
 def get_default_color(plot=None):
     colors = [
@@ -47,16 +192,15 @@ def get_default_color(plot=None):
         return colors[0]
 
 
-def get_default_alpha(plot=None):
-    return 1.0
+_RENDERER_ARGS = ['name', 'x_range_name', 'y_range_name',
+                  'level', 'view', 'visible', 'muted']
 
 
 def _pop_renderer_args(kwargs):
-    result = dict(data_source=kwargs.pop('source', ColumnDataSource()))
-    for attr in ['name', 'x_range_name', 'y_range_name', 'level', 'visible', 'muted']:
-        val = kwargs.pop(attr, None)
-        if val:
-            result[attr] = val
+    result = {attr: kwargs.pop(attr)
+              for attr in _RENDERER_ARGS
+              if attr in kwargs}
+    result['data_source'] = kwargs.pop('source', ColumnDataSource())
     return result
 
 
@@ -110,9 +254,18 @@ def _get_legend_item_label(kwargs):
 
 
 _GLYPH_SOURCE_MSG = """
-Supplying a user-defined data source AND iterable values to glyph methods is deprecated.
+Supplying a user-defined data source AND iterable values to glyph methods is
+not possibe. Either:
 
-See https://github.com/bokeh/bokeh/issues/2056 for more information.
+Pass all data directly as literals:
+
+    p.circe(x=a_list, y=an_array, ...)
+
+Or, put all data in a ColumnDataSource and pass column names:
+
+    source = ColumnDataSource(data=dict(x=a_list, y=an_array))
+    p.circe(x='x', y='x', source=source, ...)
+
 """
 
 
@@ -140,7 +293,7 @@ def _process_sequence_literals(glyphclass, kwargs, source, is_user_source):
             raise RuntimeError("Columns need to be 1D (%s is not)" % var)
 
         if is_user_source:
-            deprecated(_GLYPH_SOURCE_MSG)
+            raise RuntimeError(_GLYPH_SOURCE_MSG)
 
         source.add(val, name=var)
         kwargs[var] = var
@@ -187,17 +340,30 @@ def _update_legend(plot, legend_item_label, glyph_renderer):
 def _get_range(range_input):
     if range_input is None:
         return DataRange1d()
+    if pd and isinstance(range_input, pd.core.groupby.GroupBy):
+        return FactorRange(factors=sorted(list(range_input.groups.keys())))
     if isinstance(range_input, Range):
         return range_input
-    if isinstance(range_input, Sequence):
+    if isinstance(range_input, (Sequence, np.ndarray)):
         if all(isinstance(x, string_types) for x in range_input):
-            return FactorRange(factors=range_input)
+            return FactorRange(factors=list(range_input))
         if len(range_input) == 2:
             try:
                 return Range1d(start=range_input[0], end=range_input[1])
             except ValueError:  # @mattpap suggests ValidationError instead
                 pass
     raise ValueError("Unrecognized range input: '%s'" % str(range_input))
+
+
+def _get_scale(range_input, axis_type):
+    if isinstance(range_input, (DataRange1d, Range1d)) and axis_type in ["linear", "datetime", "auto", None]:
+        return LinearScale()
+    elif isinstance(range_input, (DataRange1d, Range1d)) and axis_type == "log":
+        return LogScale()
+    elif isinstance(range_input, FactorRange):
+        return CategoricalScale()
+    else:
+        raise ValueError("Unable to determine proper scale for: '%s'" % str(range_input))
 
 
 def _get_axis_class(axis_type, range_input):
@@ -251,7 +417,6 @@ _known_tools = {
     "yzoom_out": lambda: ZoomOutTool(dimensions='height'),
     "xwheel_pan": lambda: WheelPanTool(dimension="width"),
     "ywheel_pan": lambda: WheelPanTool(dimension="height"),
-    "resize": lambda: ResizeTool(),
     "click": lambda: TapTool(behavior="inspect"),
     "tap": lambda: TapTool(),
     "crosshair": lambda: CrosshairTool(),
@@ -302,11 +467,10 @@ def _process_axis_and_grid(plot, axis_type, axis_location, minor_ticks, axis_lab
     if axiscls:
 
         if axiscls is LogAxis:
-            # TODO (bev) this mapper type hinting is ugly
             if dim == 0:
-                plot.x_mapper_type = 'log'
+                plot.x_scale = LogScale()
             elif dim == 1:
-                plot.y_mapper_type = 'log'
+                plot.y_scale = LogScale()
             else:
                 raise ValueError("received invalid dimension value: %r" % dim)
 
@@ -373,13 +537,14 @@ def _process_tools_arg(plot, tools):
     return tool_objs, tool_map
 
 
-def _process_active_tools(toolbar, tool_map, active_drag, active_scroll, active_tap):
+def _process_active_tools(toolbar, tool_map, active_drag, active_inspect, active_scroll, active_tap):
     """ Adds tools to the plot object
 
     Args:
         toolbar (Toolbar): instance of a Toolbar object
         tools_map (dict[str]|Tool): tool_map from _process_tools_arg
         active_drag (str or Tool): the tool to set active for drag
+        active_inspect (str or Tool): the tool to set active for inspect
         active_scroll (str or Tool): the tool to set active for scroll
         active_tap (str or Tool): the tool to set active for tap
 
@@ -395,6 +560,13 @@ def _process_active_tools(toolbar, tool_map, active_drag, active_scroll, active_
         toolbar.active_drag = tool_map[active_drag]
     else:
         raise ValueError("Got unknown %r for 'active_drag', which was not a string supplied in 'tools' argument" % active_drag)
+
+    if active_inspect in ['auto', None] or isinstance(active_inspect, Tool) or all([isinstance(t, Tool) for t in active_inspect]):
+        toolbar.active_inspect = active_inspect
+    elif active_inspect in tool_map:
+        toolbar.active_inspect = tool_map[active_inspect]
+    else:
+        raise ValueError("Got unknown %r for 'active_inspect', which was not a string supplied in 'tools' argument" % active_scroll)
 
     if active_scroll in ['auto', None] or isinstance(active_scroll, Tool):
         toolbar.active_scroll = active_scroll
@@ -414,10 +586,15 @@ def _get_argspecs(glyphclass):
     argspecs = OrderedDict()
     for arg in glyphclass._args:
         spec = {}
-        prop = getattr(glyphclass, arg)
-        spec['desc'] = " ".join(x.strip() for x in prop.__doc__.strip().split("\n\n")[0].split('\n'))
-        spec['default'] = prop.class_default(glyphclass)
-        spec['type'] = prop.__class__.__name__
+        descriptor = getattr(glyphclass, arg)
+
+        # running python with -OO will discard docstrings -> __doc__ is None
+        if descriptor.__doc__:
+            spec['desc'] = "\n        ".join(textwrap.dedent(descriptor.__doc__).split("\n"))
+        else:
+            spec['desc'] = ""
+        spec['default'] = descriptor.class_default(glyphclass)
+        spec['type'] = descriptor.property._sphinx_type()
         argspecs[arg] = spec
     return argspecs
 
@@ -454,7 +631,9 @@ def _get_sigfunc(func_name, func, argspecs):
     eval(func_code, {"func": func}, func_globals)
     return func_globals[func_name]
 
-_arg_template = "    %s (%s) : %s (default %r)"
+_arg_template = """    %s (%s) : %s
+        (default: %r)
+"""
 _doc_template = """ Configure and add %s glyphs to this Figure.
 
 Args:
@@ -483,17 +662,21 @@ Returns:
 def _add_sigfunc_info(func, argspecs, glyphclass, extra_docs):
     func.__name__ = glyphclass.__name__.lower()
 
+    omissions = {'js_event_callbacks', 'js_property_callbacks', 'subscribed_events'}
+
     kwlines = []
     kws = glyphclass.properties() - set(argspecs)
     for kw in kws:
-        prop = getattr(glyphclass, kw)
-        if prop.__doc__:
-            typ = prop.__class__.__name__
-            desc = " ".join(x.strip() for x in prop.__doc__.strip().split("\n\n")[0].split('\n'))
+        # these are not really useful, and should also really be private, just skip them
+        if kw in omissions: continue
+
+        descriptor = getattr(glyphclass, kw)
+        typ = descriptor.property._sphinx_type()
+        if descriptor.__doc__:
+            desc = "\n        ".join(textwrap.dedent(descriptor.__doc__).split("\n"))
         else:
-            typ = str(prop)
             desc = ""
-        kwlines.append(_arg_template % (kw, typ, desc, prop.class_default(glyphclass)))
+        kwlines.append(_arg_template % (kw, typ, desc, descriptor.class_default(glyphclass)))
     extra_kws = getattr(glyphclass, '_extra_kws', {})
     for kw, (typ, desc) in extra_kws.items():
         kwlines.append("    %s (%s) : %s" % (kw, typ, desc))
@@ -584,6 +767,8 @@ def _glyph_function(glyphclass, extra_docs=None):
     argspecs = _get_argspecs(glyphclass)
 
     sigfunc = _get_sigfunc(glyphclass.__name__.lower(), func, argspecs)
+
+    sigfunc.glyph_method = True
 
     _add_sigfunc_info(sigfunc, argspecs, glyphclass, extra_docs)
 
