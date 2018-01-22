@@ -13,7 +13,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import pytest ; pytest
 
-from bokeh.util.api import INTERNAL, PUBLIC ; INTERNAL, PUBLIC
+from bokeh.util.api import DEV, GENERAL ; DEV, GENERAL
 from bokeh.util.testing import verify_api ; verify_api
 
 #-----------------------------------------------------------------------------
@@ -36,12 +36,12 @@ import bokeh.embed.server as bes
 
 api = {
 
-    PUBLIC: (
+    GENERAL: (
 
         ( 'server_document', (1, 0, 0) ),
         ( 'server_session',  (1, 0, 0) ),
 
-    ), INTERNAL: (
+    ), DEV: (
 
         ( 'server_html_page_for_session', (1, 0, 0) ),
 
@@ -63,7 +63,7 @@ def test_plot():
     return test_plot
 
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 class TestServerDocument(object):
@@ -209,6 +209,26 @@ class TestServerSession(object):
         r = bes.server_session(test_plot, session_id='fakesession', resources=None)
         assert 'resources=none' in r
 
+    def test_model_none(self):
+        r = bes.server_session(None, session_id='fakesession')
+        html = bs4.BeautifulSoup(r, "lxml")
+        scripts = html.findAll(name='script')
+        assert len(scripts) == 1
+        attrs = scripts[0].attrs
+        assert set(attrs), set([
+            'src',
+            'data-bokeh-doc-id',
+            'data-bokeh-model-id',
+            'id'
+        ])
+        divid = attrs['id']
+        src = "%s/autoload.js?bokeh-autoload-element=%s&bokeh-absolute-url=%s&bokeh-session-id=fakesession" % \
+              ("http://localhost:5006", divid, "http://localhost:5006")
+        assert attrs == { 'data-bokeh-doc-id' : '',
+                          'data-bokeh-model-id' : '',
+                          'id' : divid,
+                          'src' : src }
+
     def test_general(self, test_plot):
         r = bes.server_session(test_plot, session_id='fakesession')
         assert 'bokeh-session-id=fakesession' in r
@@ -231,7 +251,7 @@ class TestServerSession(object):
                           'src' : src }
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

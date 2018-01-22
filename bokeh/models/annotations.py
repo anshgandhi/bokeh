@@ -7,7 +7,8 @@ from __future__ import absolute_import
 from six import string_types
 
 from ..core.enums import (AngleUnits, Dimension, FontStyle, LegendClickPolicy, LegendLocation,
-                          Orientation, RenderMode, SpatialUnits, TextAlign)
+                          Orientation, RenderMode, SpatialUnits, VerticalAlign, TextAlign,
+                          TooltipAttachment)
 from ..core.has_props import abstract
 from ..core.properties import (Angle, AngleSpec, Auto, Bool, ColorSpec, Datetime, Dict, DistanceSpec, Either,
                                Enum, Float, FontSizeSpec, Include, Instance, Int, List, NumberSpec, Override,
@@ -108,7 +109,9 @@ class Legend(Annotation):
     """)
 
     inactive_props = Include(FillProps, help="""
-    The %s for the legend background style when inactive.
+    The %s for the legend item style when inactive. These control an overlay
+    on the item that can be used to obscure it when the corresponding glyph
+    is inactive (e.g. by making it semi-transparent).
     """)
 
     click_policy = Enum(LegendClickPolicy, default="none", help="""
@@ -121,7 +124,7 @@ class Legend(Annotation):
 
     inactive_fill_color = Override(default="white")
 
-    inactive_fill_alpha = Override(default=0.9)
+    inactive_fill_alpha = Override(default=0.7)
 
     label_props = Include(TextProps, help="""
     The %s for the legend labels.
@@ -879,9 +882,12 @@ class Title(TextAnnotation):
     The text value to render.
     """)
 
-    align = Enum(TextAlign, default='left', help="""
-    Location to align the title text.
+    vertical_align = Enum(VerticalAlign, default='bottom', help="""
+    Aligment of the text in its enclosing space, *across* the direction of the text.
+    """)
 
+    align = Enum(TextAlign, default='left', help="""
+    Aligment of the text in its enclosing space, *along* the direction of the text.
     """)
 
     offset = Float(default=0, help="""
@@ -975,8 +981,8 @@ class Tooltip(Annotation):
     '''
     level = Override(default="overlay")
 
-    attachment = Enum("horizontal", "vertical", "left", "right", "above", "below", help="""
-    Whether the tooltip should display to the left or right off the cursor
+    attachment = Enum(TooltipAttachment, help="""
+    Whether the tooltip should be displayed to the left or right of the cursor
     position or above or below it, or if it should be automatically placed
     in the horizontal or vertical dimension.
     """)
@@ -1042,3 +1048,9 @@ class Whisker(Annotation):
     """)
 
     level = Override(default="underlay")
+
+class ToolbarPanel(Annotation): # TODO: this shouldn't be an annotation
+
+    toolbar = Instance(".models.tools.Toolbar", help="""
+    A toolbar to display.
+    """)

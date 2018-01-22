@@ -9,7 +9,7 @@ from ..core.property_mixins import LineProps, FillProps
 from ..core.query import find
 from ..core.validation import error, warning
 from ..core.validation.errors import REQUIRED_RANGE, REQUIRED_SCALE, INCOMPATIBLE_SCALE_AND_RANGE
-from ..core.validation.warnings import MISSING_RENDERERS, NO_DATA_RENDERERS, SNAPPED_TOOLBAR_ANNOTATIONS
+from ..core.validation.warnings import MISSING_RENDERERS, NO_DATA_RENDERERS
 from ..util.deprecation import deprecated
 from ..util.plot_utils import _list_attr_splat, _select_helper
 from ..util.string import nice_join
@@ -20,7 +20,7 @@ from .glyphs import Glyph
 from .grids import Grid
 from .layouts import LayoutDOM
 from .ranges import Range, FactorRange, DataRange1d, Range1d
-from .renderers import DataRenderer, DynamicImageRenderer, GlyphRenderer, Renderer, TileRenderer
+from .renderers import DataRenderer, GlyphRenderer, Renderer, TileRenderer
 from .scales import Scale, CategoricalScale, LinearScale, LogScale
 from .sources import DataSource, ColumnDataSource
 from .tools import Tool, Toolbar
@@ -195,6 +195,16 @@ class Plot(LayoutDOM):
     def tools(self, tools):
         self.toolbar.tools = tools
 
+    @property
+    def toolbar_sticky(self):
+        deprecated("Plot.toolbar_sticky property is no longer needed, and its use is deprecated."\
+                   "In the future, accessing Plot.toolbar_sticky will result in an AttributeError.")
+        return True
+
+    @toolbar_sticky.setter
+    def toolbar_sticky(self, val):
+        deprecated("Plot.toolbar_sticky property is no longer needed, and its use is deprecated."\
+                   "In the future, accessing Plot.toolbar_sticky will result in an AttributeError.")
 
     def add_layout(self, obj, place='center'):
         ''' Adds an object to the plot in a specified place.
@@ -294,24 +304,6 @@ class Plot(LayoutDOM):
         self.renderers.append(tile_renderer)
         return tile_renderer
 
-    def add_dynamic_image(self, image_source, **kw):
-        ''' Adds new DynamicImageRenderer into the Plot.renderers
-
-        Args:
-            image_source (ImageSource) : a image source instance which contain image configuration
-
-        Keyword Arguments:
-            Additional keyword arguments are passed on as-is to the dynamic image renderer
-
-        Returns:
-            DynamicImageRenderer : DynamicImageRenderer
-
-        '''
-        deprecated((0, 12, 7), "add_dynamic_image", "GeoViews for GIS functions on top of Bokeh (http://geo.holoviews.org)")
-        image_renderer = DynamicImageRenderer(image_source=image_source, **kw)
-        self.renderers.append(image_renderer)
-        return image_renderer
-
     @error(REQUIRED_RANGE)
     def _check_required_range(self):
         missing = []
@@ -365,15 +357,6 @@ class Plot(LayoutDOM):
     @warning(NO_DATA_RENDERERS)
     def _check_no_data_renderers(self):
         if len(self.select(DataRenderer)) == 0:
-            return str(self)
-
-    @warning(SNAPPED_TOOLBAR_ANNOTATIONS)
-    def _check_snapped_toolbar_and_axis(self):
-        if not self.toolbar_sticky: return
-        if self.toolbar_location is None: return
-
-        objs = getattr(self, self.toolbar_location)
-        if len(objs) > 0:
             return str(self)
 
     x_range = Instance(Range, help="""
@@ -446,9 +429,8 @@ class Plot(LayoutDOM):
     """)
 
     toolbar = Instance(Toolbar, help="""
-        The toolbar associated with this plot which holds all the tools.
-
-        The toolbar is automatically created with the plot.
+    The toolbar associated with this plot which holds all the tools. It is
+    automatically created with the plot if necessary.
     """)
 
     toolbar_location = Enum(Location, default="right", help="""
@@ -656,6 +638,10 @@ class Plot(LayoutDOM):
         setting only sets the initial plot draw and subsequent resets. It is
         possible for tools (single axis zoom, unconstrained box zoom) to
         change the aspect ratio.
+
+    .. warning::
+        This setting is incompatible with linking dataranges across multiple
+        plots. Doing so may result in undefined behaviour.
     """)
 
     aspect_scale = Float(default=1, help="""

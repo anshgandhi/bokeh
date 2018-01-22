@@ -22,11 +22,12 @@ always be active regardless of what other tools are currently active.
 '''
 from __future__ import absolute_import
 
-from ..core.enums import Anchor, Dimension, Dimensions, Location, TooltipFieldFormatter
+from ..core.enums import (Anchor, Dimension, Dimensions, Location,
+                          TooltipFieldFormatter, TooltipAttachment)
 from ..core.has_props import abstract
 from ..core.properties import (
     Auto, Bool, Color, Dict, Either, Enum, Float, Percent, Instance, List,
-    Override, Seq, String, Tuple
+    Seq, String, Tuple
 )
 from ..model import Model
 from ..util.deprecation import deprecated
@@ -34,7 +35,7 @@ from ..util.deprecation import deprecated
 from .annotations import BoxAnnotation, PolyAnnotation
 from .callbacks import Callback
 from .renderers import Renderer
-from .layouts import Box, LayoutDOM
+from .layouts import LayoutDOM
 
 
 @abstract
@@ -42,8 +43,6 @@ class Tool(Model):
     ''' A base class for all interactive tool types.
 
     '''
-
-    __deprecated_attributes__ = ["plot"]
 
     @property
     def plot(self):
@@ -96,7 +95,7 @@ class Inspection(Tool):
     """)
 
 @abstract
-class ToolbarBase(LayoutDOM):
+class ToolbarBase(Model):
     ''' A base class for different toolbars.
 
     '''
@@ -109,11 +108,6 @@ class ToolbarBase(LayoutDOM):
     tools = List(Instance(Tool), help="""
     A list of tools to add to the plot.
     """)
-
-    # This is an odd case. The sizing is custom handled. In the future we will
-    # probably set it as `stretch_width` or `stretch_height` depending on its
-    # orientation.
-    sizing_mode = Override(default=None)
 
 
 class Toolbar(ToolbarBase):
@@ -138,35 +132,20 @@ class Toolbar(ToolbarBase):
     Specify a tap/click tool to be active when the plot is displayed.
     """)
 
+class ProxyToolbar(ToolbarBase):
+    ''' A toolbar that allow to merge and proxy tools of toolbars in multiple plots. '''
 
-class ToolbarBox(Box):
+class ToolbarBox(LayoutDOM):
     ''' A layoutable toolbar that can accept the tools of multiple plots, and
     can merge the tools into a single button for convenience.
 
     '''
-    def _check_empty_layout(self):
-        # Overriding the children check from Box. As toolbarbox's children
-        # are normally set JS side.
-        return None
 
-    toolbar_location = Enum(Location, default='right', help="""
-        Should the toolbar be presented as if it was stuck to the `above`, `right`, `left`, `below`
-        edge of a plot. Default is `right`.
+    toolbar = Instance(ToolbarBase, help="""
+    A toolbar associated with a plot which holds all its tools.
     """)
 
-    tools = List(Instance(Tool), help="""
-    A list of tools to add to the plot.
-    """)
-
-    merge_tools = Bool(default=True, help="""
-        Merge all the tools together so there is one tool to control all the plots.
-    """)
-
-    logo = Enum("normal", "grey", help="""
-    What version of the Bokeh logo to display on the toolbar. If
-    set to None, no logo will be displayed.
-    """)
-
+    toolbar_location = Enum(Location, default="right")
 
 class PanTool(Drag):
     ''' *toolbar icon*: |pan_icon|
@@ -264,10 +243,7 @@ class ResetTool(Action):
 
     '''
 
-    reset_size = Bool(default=True, help="""
-    Whether activating the Reset tool should also reset the plot's canvas
-    dimensions to their original size.
-    """)
+    pass
 
 
 class TapTool(Tap):
@@ -673,8 +649,13 @@ class HoverTool(Inspection):
     off by setting ``tooltips=None``.
 
     .. warning::
+        When supplying a callback or custom template, the explicit intent
+        of this Bokeh Model is to embed *raw HTML and  JavaScript code* for
+        a browser to execute. If any part of the code is derived from untrusted
+        user inputs, then you must take appropriate care to sanitize the user
+        input prior to passing to Bokeh.
 
-        Hover tool does not currently work with the following glyphs:
+    Hover tool does not currently work with the following glyphs:
 
         .. hlist::
             :columns: 3
@@ -719,7 +700,7 @@ class HoverTool(Inspection):
             default=[
                 ("index","$index"),
                 ("data (x, y)","($x, $y)"),
-                ("canvas (x, y)","($sx, $sy)"),
+                ("screen (x, y)","($sx, $sy)"),
             ], help="""
     The (name, field) pairs describing what the hover tool should
     display when there is a hit.
@@ -836,8 +817,10 @@ class HoverTool(Inspection):
     point of a tooltip. The default is to attach to the center of a glyph.
     """)
 
-    attachment = Enum("horizontal", "vertical", help="""
-    Whether tooltip's arrow should appear in the horizontal or vertical dimension.
+    attachment = Enum(TooltipAttachment, help="""
+    Whether the tooltip should be displayed to the left or right of the cursor
+    position or above or below it, or if it should be automatically placed
+    in the horizontal or vertical dimension.
     """)
 
     show_arrow = Bool(default=True, help="""

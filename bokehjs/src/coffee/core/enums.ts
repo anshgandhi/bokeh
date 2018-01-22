@@ -35,6 +35,9 @@ export const LegendLocation: LegendLocation[] = [
   "bottom_left", "bottom_center", "bottom_right",
 ]
 
+export type Anchor = LegendLocation
+export const Anchor: Anchor[] = LegendLocation
+
 export type Orientation = "vertical" | "horizontal"
 export const Orientation: Orientation[] = ["vertical", "horizontal"]
 
@@ -47,8 +50,11 @@ export const RenderLevel: RenderLevel[] = ["image", "underlay", "glyph", "annota
 export type RenderMode = "canvas" | "css"
 export const RenderMode: RenderMode[] = ["canvas", "css"]
 
-export type Side = "left" | "right"
-export const Side: Side[] = ["left", "right"]
+export type Side = "above" | "below" | "left" | "right"
+export const Side: Side[] = ["above", "below", "left", "right"]
+
+export type Place = Side | "center"
+export const Place: Place[] = ["above", "below", "left", "right", "center"]
 
 export type SpatialUnits = "screen" | "data"
 export const SpatialUnits: SpatialUnits[] = ["screen", "data"]
@@ -56,11 +62,17 @@ export const SpatialUnits: SpatialUnits[] = ["screen", "data"]
 export type StartEnd = "start" | "end"
 export const StartEnd: StartEnd[] = ["start", "end"]
 
+export type VerticalAlign = "top" | "middle" | "bottom"
+export const VerticalAlign: VerticalAlign[] = ["top", "middle", "bottom"]
+
 export type TextAlign = "left" | "right" | "center"
 export const TextAlign: TextAlign[] = ["left", "right", "center"]
 
 export type TextBaseline = "top" | "middle" | "bottom" | "alphabetic" | "hanging" | "ideographic"
 export const TextBaseline: TextBaseline[] = ["top", "middle", "bottom", "alphabetic", "hanging", "ideographic"]
+
+export type TooltipAttachment = "horizontal" | "vertical" | "left" | "right" | "above" | "below"
+export const TooltipAttachment: TooltipAttachment[] = ["horizontal", "vertical", "left", "right", "above", "below"]
 
 export type DistributionTypes = "uniform" | "normal"
 export const DistributionTypes: DistributionTypes[] = ["uniform", "normal"]
@@ -73,3 +85,6 @@ export const SizingMode: SizingMode[] = ["stretch_both", "scale_width", "scale_h
 
 export type PaddingUnits = "percent" | "absolute"
 export const PaddingUnits: PaddingUnits[] = ["percent", "absolute"]
+
+export type SliderCallbackPolicy = "continuous" | "throttle" | "mouseup"
+export const SliderCallbackPolicy: SliderCallbackPolicy[] = ["continuous", "throttle", "mouseup"]

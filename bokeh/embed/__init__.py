@@ -17,7 +17,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 log = logging.getLogger(__name__)
 
-from bokeh.util.api import public, internal ; public, internal
+from bokeh.util.api import general, dev ; general, dev
 
 #-----------------------------------------------------------------------------
 # Imports
@@ -30,10 +30,8 @@ from bokeh.util.api import public, internal ; public, internal
 # Bokeh imports
 
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
-
-from .notebook import notebook_content
 
 from .server import server_document
 from .server import server_session
@@ -43,20 +41,9 @@ from .standalone import components
 from .standalone import file_html
 
 __all__ = (
-    'autoload_server',
     'autoload_static',
     'components',
     'file_html',
-    'notebook_content',
     'server_document',
     'server_session',
 )
-
-# XXXX To be removed
-def autoload_server(model=None, app_path=None, session_id=None, url="default", relative_urls=False, arguments=None):
-    from bokeh.util.deprecation import deprecated
-    deprecated((0, 12, 7), 'bokeh.embed.autoload_server', 'bokeh.embed.server_document or bokeh.embed.server_session')
-    if session_id is None:
-        return server_document(url, relative_urls, "default", arguments)
-    else:
-        return server_session(model, session_id, url, relative_urls, "default", arguments)

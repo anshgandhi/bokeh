@@ -7,6 +7,7 @@
     "noImplicitReturns": true,
     "strictNullChecks": true,
     "alwaysStrict": true,
+    "noErrorTruncation": true,
     "noEmitOnError": false,
     "module": "commonjs",
     "moduleResolution": "node",
@@ -17,6 +18,6 @@
     "importHelpers": true,
     "experimentalDecorators": true,
     "types": [],
-    "baseUrl": "./build/js/tree_ts/"
+    "baseUrl": "./src/coffee/"
   }
 }

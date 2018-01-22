@@ -13,7 +13,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import pytest ; pytest
 
-from bokeh.util.api import INTERNAL, PUBLIC ; INTERNAL, PUBLIC
+from bokeh.util.api import DEV, GENERAL ; DEV, GENERAL
 from bokeh.util.testing import verify_api ; verify_api
 
 #-----------------------------------------------------------------------------
@@ -26,7 +26,7 @@ from mock import patch
 # External imports
 
 # Bokeh imports
-from bokeh.core.templates import DOC_JS, PLOT_DIV
+from bokeh.core.templates import DOC_NB_JS, PLOT_DIV
 from bokeh.core.json_encoder import serialize_json
 
 # Module under test
@@ -38,11 +38,11 @@ import bokeh.embed.notebook as ben
 
 api = {
 
-    PUBLIC: (
+    GENERAL: (
+
+    ), DEV: (
 
         ( 'notebook_content', (1,0,0) ),
-
-    ), INTERNAL: (
 
     )
 
@@ -62,7 +62,7 @@ def test_plot():
     return test_plot
 
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 class Test_notebook_content(object):
@@ -72,7 +72,7 @@ class Test_notebook_content(object):
         (docs_json, render_items) = ("DOC_JSON", [dict(docid="foo", elementid="bar", modelid="bat")])
         mock_sdjari.return_value = (docs_json, render_items)
 
-        expected_script = DOC_JS.render(docs_json=serialize_json(docs_json),
+        expected_script = DOC_NB_JS.render(docs_json=serialize_json(docs_json),
                                         render_items=serialize_json(render_items))
         expected_div = PLOT_DIV.render(elementid=render_items[0]['elementid'])
 
@@ -93,13 +93,13 @@ class Test_notebook_content(object):
         assert 'notebook_comms_target' in render_items[0]
 
         ## assert that NOTEBOOK_COMMS_TARGET ends up in generated script
-        expected_script = DOC_JS.render(docs_json=serialize_json(docs_json),
+        expected_script = DOC_NB_JS.render(docs_json=serialize_json(docs_json),
                                         render_items=serialize_json(render_items))
 
         assert script == expected_script
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

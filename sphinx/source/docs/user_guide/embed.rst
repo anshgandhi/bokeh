@@ -84,6 +84,9 @@ The returned ``<script>`` will look something like:
 
     </script>
 
+Note that in Jupyter Notebooks, it is not possible to use components and show in
+the same notebook cell.
+
 All of the data and plot or widget objects are contained in the ``docs_json``
 variable (contents omitted here for brevity). The resulting ``<div>`` will
 look something like:
@@ -271,33 +274,6 @@ You can see an example by running:
 .. code:: bash
 
     python /bokeh/examples/embed/embed_multiple.py
-
-.. _userguide_embed_notebook:
-
-IPython Notebook
-----------------
-
-Bokeh can also generate ``<div>`` tags suitable for inline display in the
-Jupyter notebook using the |notebook_div| function:
-
-.. code-block:: python
-
-    from bokeh.plotting import figure
-    from bokeh.embed import notebook_div
-
-    plot = figure()
-    plot.circle([1,2], [3,4])
-
-    div = notebook_div(plot)
-
-The returned div contains the same sort of ``<script>`` and ``<div>`` that
-the |components| function above returns.
-
-.. note::
-    This is a fairly low-level, explicit way to generate a Jupyter
-    notebook div. When using the |bokeh.plotting| interface, users will
-    typically call the function |output_notebook| in conjunction with
-    |show| instead.
 
 .. _userguide_embed_autoloading:
 
@@ -493,4 +469,3 @@ on the server at `"some/path"`, from the document that has the plot embedded.
 .. |autoload_static| replace:: :func:`~bokeh.embed.autoload_static`
 .. |components|      replace:: :func:`~bokeh.embed.components`
 .. |file_html|       replace:: :func:`~bokeh.embed.file_html`
-.. |notebook_div|    replace:: :func:`~bokeh.embed.notebook_div`

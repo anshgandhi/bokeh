@@ -13,7 +13,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import pytest ; pytest
 
-from bokeh.util.api import INTERNAL, PUBLIC ; INTERNAL, PUBLIC
+from bokeh.util.api import DEV, GENERAL ; DEV, GENERAL
 from bokeh.util.testing import verify_api ; verify_api
 
 #-----------------------------------------------------------------------------
@@ -36,9 +36,9 @@ import bokeh.embed.util as beu
 
 api = {
 
-    PUBLIC: (
+    GENERAL: (
 
-    ), INTERNAL: (
+    ), DEV: (
 
         ( 'FromCurdoc',                            (1,0,0) ),
         ( 'check_models_or_docs',                  (1,0,0) ),
@@ -51,6 +51,7 @@ api = {
         ( 'wrap_in_onload',                        (1,0,0) ),
         ( 'wrap_in_safely',                        (1,0,0) ),
         ( 'wrap_in_script_tag',                    (1,0,0) ),
+        ( 'escape',                                (1,0,0) ),
 
     )
 
@@ -63,11 +64,11 @@ Test_api = verify_api(beu, api)
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 class Test_FromCurdoc(object):
@@ -125,7 +126,7 @@ class Test_wrap_in_onload(object):
   };
   if (document.readyState != "loading") fn();
   else document.addEventListener("DOMContentLoaded", fn);
-})();
+})();\
 """
 
 class Test_wrap_in_safely(object):
@@ -135,16 +136,18 @@ class Test_wrap_in_safely(object):
 Bokeh.safely(function() {
   code
   morecode
-});"""
+});\
+"""
 
 class Test_wrap_in_script_tag(object):
 
     def test_render(self):
         assert beu.wrap_in_script_tag("code\nmorecode") == """
 <script type="text/javascript">
-    code
-morecode
-</script>"""
+  code
+  morecode
+</script>\
+"""
 
 #-----------------------------------------------------------------------------
 # Private API
@@ -158,11 +161,11 @@ def test__ONLOAD():
   };
   if (document.readyState != "loading") fn();
   else document.addEventListener("DOMContentLoaded", fn);
-})();
+})();\
 """
 
 def test__SAFELY():
     assert beu._SAFELY == """\
 Bokeh.safely(function() {
 %(code)s
-});"""
+});"""\

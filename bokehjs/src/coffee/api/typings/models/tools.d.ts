@@ -62,7 +62,7 @@ declare namespace Bokeh {
   export var ResetTool: { new(attributes?: IResetTool, options?: ModelOpts): ResetTool };
   export interface ResetTool extends Tool, IResetTool {}
   export interface IResetTool extends ITool {
-    reset_size?: Boolean;
+
   }
 
   export var CrosshairTool: { new(attributes?: ICrosshairTool, options?: ModelOpts): CrosshairTool };
@@ -107,8 +107,6 @@ declare namespace Bokeh {
     index:  Int;
     x:      ArrayLike<number>;
     y:      ArrayLike<number>;
-    vx:     ArrayLike<number>;
-    vy:     ArrayLike<number>;
     sx:     ArrayLike<number>;
     sy:     ArrayLike<number>;
     data_x: ArrayLike<number>;
@@ -124,8 +122,6 @@ declare namespace Bokeh {
       direction?: "h" | "v";
       x: ArrayLike<number>;
       y: ArrayLike<number>;
-      vx: ArrayLike<number>;
-      vy: ArrayLike<number>;
       sx: ArrayLike<number>;
       sy: ArrayLike<number>;
     };

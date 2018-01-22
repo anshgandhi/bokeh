@@ -45,6 +45,14 @@ Bokeh
   </td>
 </tr>
 <tr>
+  <td>Live Tutorial</td>
+  <td>
+    <a href="https://mybinder.org/v2/gh/bokeh/bokeh-notebooks/master?filepath=tutorial%2F00%20-%20Introduction%20and%20Setup.ipynb">
+    <img src="https://mybinder.org/badge.svg" />
+    </a>
+  </td>
+</tr>
+<tr>
   <td>Gitter</td>
   <td>
     <a href="https://gitter.im/bokeh/bokeh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge">
@@ -55,7 +63,7 @@ Bokeh
 <tr>
   <td>Twitter</td>
   <td>
-    <a href="https://https://twitter.com/BokehPlots">
+    <a href="https://twitter.com/BokehPlots">
     <img src="https://img.shields.io/twitter/follow/bokehplots.svg?style=social&label=Follow" />
     </a>
   </td>
@@ -216,7 +224,7 @@ very large or streaming datasets.
 
 Installation
 ------------
-We recommend using the [Anaconda Python distribution](https://anaconda.com/why-anaconda) and conda to install Bokeh. Enter this command at a Bash or Windows command prompt:
+We recommend using the [Anaconda Python distribution](https://www.anaconda.com/what-is-anaconda/) and conda to install Bokeh. Enter this command at a Bash or Windows command prompt:
 
 ```
 conda install bokeh
@@ -228,7 +236,7 @@ To begin using Bokeh or to install using `pip`, follow the [Quickstart](https://
 
 Documentation
 -------------
-Visit the [Bokeh web page](https://bokeh.pydata.org/en/latest) for information and full documentation.
+Visit the [Bokeh web page](https://bokeh.pydata.org/en/latest) for information and full documentation, or [launch the Bokeh tutorial](https://mybinder.org/v2/gh/bokeh/bokeh-notebooks/master?filepath=tutorial%2F00%20-%20Introduction%20and%20Setup.ipynb) in live Jupyter Notebooks
 
 Contribute to Bokeh
 -------------------

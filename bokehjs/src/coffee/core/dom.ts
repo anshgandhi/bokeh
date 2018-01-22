@@ -3,8 +3,9 @@ import {isBoolean, isString, isArray, isObject} from "./util/types"
 export type HTMLAttrs = { [name: string]: any }
 export type HTMLChild = string | HTMLElement | (string | HTMLElement)[]
 
-const _createElement = (tag: string) => (attrs: HTMLAttrs = {}, ...children: HTMLChild[]): HTMLElement => {
-  const element: HTMLElement = document.createElement(tag)
+const _createElement = <T extends keyof HTMLElementTagNameMap>(tag: T) =>
+    (attrs: HTMLAttrs = {}, ...children: HTMLChild[]): HTMLElementTagNameMap[T] => {
+  const element = document.createElement(tag)
 
   for (const attr in attrs) {
     const value = attrs[attr]
@@ -56,27 +57,30 @@ const _createElement = (tag: string) => (attrs: HTMLAttrs = {}, ...children: HTM
   return element
 }
 
-export function createElement(tag: string, attrs: HTMLAttrs, ...children: HTMLChild[]): HTMLElement {
+export function createElement<T extends keyof HTMLElementTagNameMap>(tag: T,
+     attrs: HTMLAttrs, ...children: HTMLChild[]): HTMLElementTagNameMap[T] {
   return _createElement(tag)(attrs, ...children)
 }
 
 export const
-  div    = _createElement("div"),
-  span   = _createElement("span"),
-  link   = _createElement("link"),
-  style  = _createElement("style"),
-  a      = _createElement("a"),
-  p      = _createElement("p"),
-  pre    = _createElement("pre"),
-  button = _createElement("button"),
-  label  = _createElement("label"),
-  input  = _createElement("input"),
-  select = _createElement("select"),
-  option = _createElement("option"),
-  canvas = _createElement("canvas"),
-  ul     = _createElement("ul"),
-  ol     = _createElement("ol"),
-  li     = _createElement("li");
+  div      = _createElement("div"),
+  span     = _createElement("span"),
+  link     = _createElement("link"),
+  style    = _createElement("style"),
+  a        = _createElement("a"),
+  p        = _createElement("p"),
+  pre      = _createElement("pre"),
+  button   = _createElement("button"),
+  label    = _createElement("label"),
+  input    = _createElement("input"),
+  select   = _createElement("select"),
+  option   = _createElement("option"),
+  optgroup = _createElement("optgroup"),
+  textarea = _createElement("textarea"),
+  canvas   = _createElement("canvas"),
+  ul       = _createElement("ul"),
+  ol       = _createElement("ol"),
+  li       = _createElement("li");
 
 export const nbsp = document.createTextNode("\u00a0")
 
@@ -95,7 +99,7 @@ export function replaceWith(element: HTMLElement, replacement: HTMLElement): voi
 }
 
 
-export function prepend(element: HTMLElement, ...nodes: HTMLElement[]): void {
+export function prepend(element: HTMLElement, ...nodes: Node[]): void {
   const first = element.firstChild
   for (const node of nodes) {
     element.insertBefore(node, first)
@@ -147,6 +151,18 @@ export function parent(el: HTMLElement, selector: string): HTMLElement | null {
   }
 
   return null
+}
+
+export type Sizing = {top: number, bottom: number, left: number, right: number}
+
+export function margin(el: HTMLElement): Sizing {
+  const style = getComputedStyle(el)
+  return {
+    top:    parseFloat(style.marginTop!)    || 0,
+    bottom: parseFloat(style.marginBottom!) || 0,
+    left:   parseFloat(style.marginLeft!)   || 0,
+    right:  parseFloat(style.marginRight!)  || 0,
+  }
 }
 
 export enum Keys {

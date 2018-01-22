@@ -1,0 +1,92 @@
+0.12.14 (Dec 2017)
+==================
+
+Bokeh Version ``0.12.14`` is an incremental update that adds a few
+important features and fixes several bugs. Some of the highlights
+include:
+
+
+Many other small bugfixes and docs additions. For full details see the
+:bokeh-tree:`CHANGELOG`.
+
+Migration Guide
+---------------
+
+NOTE: the 0.12.x series is the last planned release series before a version
+1.0 release. For more information see the `project roadmap`_.
+
+Mapping of Unknown Catgorical Factors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Previously, data (e.g in a CDS column) referring to a categorical factor that
+did not exist in the relevant ``FactorRange``, would cause an error in the
+browser. Now, any such attempted mappings will silently return ``NaN``. Any
+data points with these factors as coordinates will not render.
+
+The practical motivation for this change is that updating a ``FactorRange``
+to have a new set of factors could result in an inconsistency triggering the
+error condition, causing plots to fail to render. With this change, the use-case
+of updating factor ranges should work more smoothly, however there will be no
+immediate indication of problems in case "bad" factors are included accidentally
+in data other than the data points not being rendered.
+
+Change To Text Glyph Legend
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Previously Text Glyphs added to legends would always unconditionally render
+the word "text" as the visual symbol, which was not useful. Now, text glyphs
+render an empty space in legends. This is helpful when it is desired to use
+an interactive legend mute or hide both a primary glyph, as well as some
+associated text that goes with it. For more discssion, see :bokeh-issue:`7337`.
+
+MercatorTileSource change
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+`MercatorTileSource` models previously snapped to the closest zoom
+level resulting in user supplied axis ranges to be largely
+ignored. The default behavior has now been changed from snapping to
+the closest zoom level to simply maintaining the correct aspect ratio,
+while keeping the user defined bounds contained within the axis
+ranges.
+
+The old behavior may be restored by setting enabling the `snap_to_zoom`
+property.
+
+Slider CSS Prefixing
+~~~~~~~~~~~~~~~~~~~~
+
+Bokeh uses `noUiSlider`_ to implement its slider widgets. Previously the
+CSS selectors for the noUiSlider components were prefixed with `bk-`.
+For example, `bk-noUi-tooltip`. Due to changes in revent versions of the
+noUiSlider package, this prefixing has been removed. Now to apply styling
+to sliders, use the standard (unprefixed) noUiSlider CSS selectors.
+
+This change affects only users applying custom styles to slider CSS.
+
+Defining views' CSS classes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This was previously done through `MyView.prototype.className`, which didn't
+respect class structure, so it was often necessary to duplicate CSS rules in
+sub-views. The new approach is to override `css_classes()` method, e.g.:
+
+.. code-block:: typescript
+
+    class MyView extends MyOtherView {
+        css_classes() {
+            return super.css_classes().concat("my-view")
+        }
+    }
+
+This change affects only creators of custom extensions.
+
+`HasProps.initialize(options)`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Previously `HasProps.initialize()` took `attrs` as the first argument. This
+was nearly never used and so it was removed. The preferred way to configure
+values of attributes is to use bokehjs' properties system. This change
+affects only creators of custom extensions.
+
+.. _noUiSlider: https://refreshless.com/nouislider/
+.. _project roadmap: https://bokehplots.com/pages/roadmap.html

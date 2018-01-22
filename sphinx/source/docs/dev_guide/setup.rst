@@ -146,7 +146,7 @@ the following commands
 .. code-block:: sh
 
     cd bokehjs
-    npm install
+    npm install --no-save
 
 This command will install the necessary packages into the ``node_modules``
 subdirectory.
@@ -252,10 +252,9 @@ The ``setup.py`` script has two main modes of operation:
 
 ``python setup.py develop``
 
-    A ``bokeh.pth`` path file will be written to your Python ``site-packages``
-    directory that points to the ``bokeh`` subdirectory of your *source
-    checkout*. Any changes you make to the python source code will be available
-    immediately without any additional steps.
+    Bokeh will be installed to refer to the source directory. Any changes
+    you make to the python source code will be available immediately without
+    any additional steps.
 
 With either mode, you will be prompted for how to install BokehJS, e.g.:
 

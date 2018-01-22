@@ -1,7 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import * as ts from "typescript"
-const coffee = require("coffee-script")
+const coffee = require("coffeescript")
 const detective = require("detective")
 const less = require("less")
 import {argv} from "yargs"
@@ -100,8 +100,6 @@ const compile_and_resolve_deps = (input: {code: string, lang: string, file: stri
       noImplicitAny: false,
       target: ts.ScriptTarget.ES5,
       module: ts.ModuleKind.CommonJS,
-      jsx: ts.JsxEmit.React,
-      reactNamespace: "DOM",
     },
   })
 

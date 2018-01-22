@@ -4,67 +4,83 @@
 //     Underscore may be freely distributed under the MIT license.
 
 import {randomIn} from "./math"
+import {assert} from "./assert"
 
 const slice = Array.prototype.slice
 
-export function last<T>(array: Array<T>): T | undefined {
+export function head<T>(array: T[]): T {
+  return array[0]
+}
+
+export function tail<T>(array: T[]): T {
   return array[array.length-1]
 }
 
-export function copy<T>(array: Array<T> /*| TypedArray*/): Array<T> {
+export function last<T>(array: T[]): T | undefined {
+  return array[array.length-1]
+}
+
+export function copy<T>(array: T[] /*| TypedArray*/): T[] {
   return slice.call(array)
 }
 
-export function concat<T>(arrays: Array<Array<T>>): Array<T> {
+export function concat<T>(arrays: T[][]): T[] {
   return ([] as T[]).concat(...arrays)
 }
 
-export function contains<T>(array: Array<T>, value: T): boolean {
+export function includes<T>(array: T[], value: T): boolean {
   return array.indexOf(value) !== -1
 }
 
-export function nth<T>(array: Array<T>, index: number): T {
+export const contains = includes
+
+export function nth<T>(array: T[], index: number): T {
   return array[index >= 0 ? index : array.length + index]
 }
 
-export function zip<A, B>(As: Array<A>, Bs: Array<B>): Array<[A, B]> {
+export function zip<A, B>(As: A[], Bs: B[]): [A, B][] {
   const n = Math.min(As.length, Bs.length)
-  const ABs = new Array<[A, B]>(n)
+  const ABs: [A, B][] = new Array(n)
   for (let i = 0; i < n; i++) {
     ABs[i] = [As[i], Bs[i]]
   }
   return ABs
 }
 
-export function unzip<A, B>(ABs: Array<[A, B]>): [Array<A>, Array<B>] {
+export function unzip<A, B>(ABs: [A, B][]): [A[], B[]] {
   const n = ABs.length
-  const As = new Array<A>(n)
-  const Bs = new Array<B>(n)
+  const As: A[] = new Array(n)
+  const Bs: B[] = new Array(n)
   for (let i = 0; i < n; i++) {
     [As[i], Bs[i]] = ABs[i]
   }
   return [As, Bs]
 }
 
-export function range(start: number, stop?: number, step: number = 1): Array<number> {
+export function range(start: number, stop?: number, step: number = 1): number[] {
+  assert(step > 0, "'step' must be a positive number")
+
   if (stop == null) {
     stop = start
     start = 0
   }
 
-  const length = Math.max(Math.ceil((stop - start) / step), 0)
+  const {max, ceil, abs} = Math
+
+  const delta = start <= stop ? step : -step
+  const length = max(ceil(abs(stop - start) / step), 0)
   const range = Array(length)
 
-  for (let i = 0; i < length; i++, start += step) {
+  for (let i = 0; i < length; i++, start += delta) {
     range[i] = start
   }
 
   return range
 }
 
-export function linspace(start: number, stop: number, num: number = 100): Array<number> {
+export function linspace(start: number, stop: number, num: number = 100): number[] {
   const step = (stop - start) / (num - 1)
-  let array = new Array(num)
+  const array = new Array(num)
 
   for (let i = 0; i < num; i++) {
     array[i] = start + step*i
@@ -73,11 +89,11 @@ export function linspace(start: number, stop: number, num: number = 100): Array<
   return array
 }
 
-export function transpose<T>(array: Array<Array<T>>): Array<Array<T>> {
+export function transpose<T>(array: T[][]): T[][] {
   const rows = array.length
   const cols = array[0].length
 
-  let transposed: Array<Array<T>> = []
+  const transposed: T[][] = []
 
   for (let j = 0; j < cols; j++) {
     transposed[j] = []
@@ -90,17 +106,17 @@ export function transpose<T>(array: Array<Array<T>>): Array<Array<T>> {
   return transposed
 }
 
-export function sum(array: Array<number>): number {
+export function sum(array: number[]): number {
   return array.reduce((a, b) => a + b, 0)
 }
 
-export function cumsum(array: Array<number>): Array<number> {
-  const result: Array<number> = []
+export function cumsum(array: number[]): number[] {
+  const result: number[] = []
   array.reduce((a, b, i) => result[i] = a + b, 0)
   return result
 }
 
-export function min(array: Array<number>): number {
+export function min(array: number[]): number {
   let value: number
   let result = Infinity
 
@@ -114,7 +130,7 @@ export function min(array: Array<number>): number {
   return result
 }
 
-export function minBy<T>(array: Array<T>, key: (item: T) => number): T {
+export function minBy<T>(array: T[], key: (item: T) => number): T {
   if (array.length == 0)
     throw new Error("minBy() called with an empty array")
 
@@ -133,7 +149,7 @@ export function minBy<T>(array: Array<T>, key: (item: T) => number): T {
   return result
 }
 
-export function max(array: Array<number>): number {
+export function max(array: number[]): number {
   let value: number
   let result = -Infinity
 
@@ -147,7 +163,7 @@ export function max(array: Array<number>): number {
   return result
 }
 
-export function maxBy<T>(array: Array<T>, key: (item: T) => number): T {
+export function maxBy<T>(array: T[], key: (item: T) => number): T {
   if (array.length == 0)
     throw new Error("maxBy() called with an empty array")
 
@@ -166,15 +182,15 @@ export function maxBy<T>(array: Array<T>, key: (item: T) => number): T {
   return result
 }
 
-export function argmin(array: Array<number>): number {
+export function argmin(array: number[]): number {
   return minBy(range(array.length), (i) => array[i])
 }
 
-export function argmax(array: Array<number>): number {
+export function argmax(array: number[]): number {
   return maxBy(range(array.length), (i) => array[i])
 }
 
-export function all<T>(array: Array<T>, predicate: (item: T) => boolean): boolean {
+export function all<T>(array: T[], predicate: (item: T) => boolean): boolean {
   for (const item of array) {
     if (!predicate(item))
       return false
@@ -182,7 +198,7 @@ export function all<T>(array: Array<T>, predicate: (item: T) => boolean): boolea
   return true
 }
 
-export function any<T>(array: Array<T>, predicate: (item: T) => boolean): boolean {
+export function any<T>(array: T[], predicate: (item: T) => boolean): boolean {
   for (const item of array) {
     if (predicate(item))
       return true
@@ -191,7 +207,7 @@ export function any<T>(array: Array<T>, predicate: (item: T) => boolean): boolea
 }
 
 function findIndexFactory(dir: number) {
-  return function<T>(array: Array<T>, predicate: (item: T) => boolean): number {
+  return function<T>(array: T[], predicate: (item: T) => boolean): number {
     const length = array.length
     let index = dir > 0 ? 0 : length - 1
     for (; index >= 0 && index < length; index += dir) {
@@ -205,17 +221,17 @@ function findIndexFactory(dir: number) {
 export const findIndex = findIndexFactory(1)
 export const findLastIndex = findIndexFactory(-1)
 
-export function find<T>(array: Array<T>, predicate: (item: T) => boolean): T | undefined {
+export function find<T>(array: T[], predicate: (item: T) => boolean): T | undefined {
   const index = findIndex(array, predicate)
   return index == -1 ? undefined : array[index]
 }
 
-export function findLast<T>(array: Array<T>, predicate: (item: T) => boolean): T | undefined {
+export function findLast<T>(array: T[], predicate: (item: T) => boolean): T | undefined {
   const index = findLastIndex(array, predicate)
   return index == -1 ? undefined : array[index]
 }
 
-export function sortedIndex<T>(array: Array<T>, value: T): number {
+export function sortedIndex<T>(array: T[], value: T): number {
   let low = 0
   let high = array.length
   while (low < high) {
@@ -228,7 +244,7 @@ export function sortedIndex<T>(array: Array<T>, value: T): number {
   return low
 }
 
-export function sortBy<T>(array: Array<T>, key: (item: T) => number): Array<T> {
+export function sortBy<T>(array: T[], key: (item: T) => number): T[] {
   const tmp = array.map((value, index) => {
     return {value: value, index: index, key: key(value) }
   })
@@ -244,22 +260,22 @@ export function sortBy<T>(array: Array<T>, key: (item: T) => number): Array<T> {
   return tmp.map((item) => item.value)
 }
 
-export function uniq<T>(array: Array<T>): Array<T> {
-  const result: Array<T> = []
+export function uniq<T>(array: T[]): T[] {
+  const result = []
   for (const value of array) {
-    if (!contains(result, value)) {
+    if (!includes(result, value)) {
       result.push(value)
     }
   }
   return result
 }
 
-export function uniqBy<T, U>(array: Array<T>, key: (item: T) => U): Array<T> {
-  const result: Array<T> = []
-  const seen: Array<U> = []
+export function uniqBy<T, U>(array: T[], key: (item: T) => U): T[] {
+  const result: T[] = []
+  const seen: U[] = []
   for (const value of array) {
     const computed = key(value)
-    if (!contains(seen, computed)) {
+    if (!includes(seen, computed)) {
       seen.push(computed)
       result.push(value)
     }
@@ -267,17 +283,17 @@ export function uniqBy<T, U>(array: Array<T>, key: (item: T) => U): Array<T> {
   return result
 }
 
-export function union<T>(...arrays: Array<Array<T>>): Array<T> {
+export function union<T>(...arrays: T[][]): T[] {
   return uniq(concat(arrays))
 }
 
-export function intersection<T>(array: Array<T>, ...arrays: Array<Array<T>>): Array<T> {
-  const result: Array<T> = []
+export function intersection<T>(array: T[], ...arrays: T[][]): T[] {
+  const result: T[] = []
   top: for (const item of array) {
-    if (contains(result, item))
+    if (includes(result, item))
       continue
     for (const other of arrays) {
-      if (!contains(other, item))
+      if (!includes(other, item))
         continue top
     }
     result.push(item)
@@ -285,12 +301,12 @@ export function intersection<T>(array: Array<T>, ...arrays: Array<Array<T>>): Ar
   return result
 }
 
-export function difference<T>(array: Array<T>, ...arrays: Array<Array<T>>): Array<T> {
+export function difference<T>(array: T[], ...arrays: T[][]): T[] {
   const rest = concat(arrays)
-  return array.filter((value) => !contains(rest, value))
+  return array.filter((value) => !includes(rest, value))
 }
 
-export function removeBy<T>(array: Array<T>, key: (item: T) => boolean): void {
+export function removeBy<T>(array: T[], key: (item: T) => boolean): void {
   for (let i = 0; i < array.length;) {
     if (key(array[i]))
       array.splice(i, 1)
@@ -305,7 +321,7 @@ export function shuffle<T>(array: T[]): T[] {
   const length = array.length
   const shuffled = new Array(length)
   for (let i = 0; i < length; i++) {
-    let rand = randomIn(0, i)
+    const rand = randomIn(0, i)
     if (rand !== i)
       shuffled[i] = shuffled[rand]
     shuffled[rand] = array[i]
@@ -315,11 +331,40 @@ export function shuffle<T>(array: T[]): T[] {
 
 export function pairwise<T, U>(array: T[], fn: (prev: T, next: T) => U): U[] {
   const n = array.length
-  const result = new Array<U>(n-1)
+  const result: U[] = new Array(n-1)
 
   for (let i = 0; i < n - 1; i++) {
     result[i] = fn(array[i], array[i+1])
   }
 
+  return result
+}
+
+export function reversed<T>(array: T[]): T[] {
+  const n = array.length
+  const result: T[] = new Array(n)
+
+  for (let i = 0; i < n; i++) {
+    result[n - i - 1] = array[i]
+  }
+
+  return result
+}
+
+export function repeat<T>(value: T, n: number): T[] {
+  const result: T[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    result[i] = value
+  }
+  return result
+}
+
+
+export function map<T, U>(array: ArrayLike<T>, fn: (item: T) => U): U[] {
+  const n = array.length
+  const result: U[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    result[i] = fn(array[i])
+  }
   return result
 }

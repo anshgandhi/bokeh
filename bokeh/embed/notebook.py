@@ -17,7 +17,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 log = logging.getLogger(__name__)
 
-from bokeh.util.api import public, internal ; public, internal
+from bokeh.util.api import general, dev ; general, dev
 
 #-----------------------------------------------------------------------------
 # Imports
@@ -29,7 +29,7 @@ from contextlib import contextmanager
 # External imports
 
 # Bokeh imports
-from ..core.templates import DOC_JS
+from ..core.templates import DOC_NB_JS
 from ..core.json_encoder import serialize_json
 from ..settings import settings
 from ..util.string import encode_utf8
@@ -41,10 +41,14 @@ from .util import check_one_model_or_doc, div_for_render_item, find_existing_doc
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
-@public((1,0,0))
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+@dev((1,0,0))
 def notebook_content(model, notebook_comms_target=None, theme=FromCurdoc):
     ''' Return script and div that will display a Bokeh plot in a Jupyter
     Notebook.
@@ -86,7 +90,7 @@ def notebook_content(model, notebook_comms_target=None, theme=FromCurdoc):
     else:
         notebook_comms_target = ''
 
-    script = DOC_JS.render(
+    script = DOC_NB_JS.render(
         docs_json=serialize_json(docs_json),
         render_items=serialize_json(render_items)
     )
@@ -94,10 +98,6 @@ def notebook_content(model, notebook_comms_target=None, theme=FromCurdoc):
     div = div_for_render_item(item)
 
     return encode_utf8(script), encode_utf8(div), new_doc
-
-#-----------------------------------------------------------------------------
-# Internal API
-#-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 # Private API
@@ -112,17 +112,17 @@ def _ModelInEmptyDocument(model, apply_theme=None):
     from ..document import Document
     doc = find_existing_docs([model])
 
-    if apply_theme is FromCurdoc:
-        from ..io import curdoc; curdoc
-        doc.theme = curdoc().theme
-    elif apply_theme is not None:
-        doc.theme = apply_theme
-
     model._document = None
     for ref in model.references():
         ref._document = None
     new_doc = Document()
     new_doc.add_root(model)
+
+    if apply_theme is FromCurdoc:
+        from ..io import curdoc; curdoc
+        new_doc.theme = curdoc().theme
+    elif apply_theme is not None:
+        new_doc.theme = apply_theme
 
     if settings.perform_document_validation():
         new_doc.validate()

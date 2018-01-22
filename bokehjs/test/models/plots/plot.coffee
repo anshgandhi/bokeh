@@ -84,7 +84,7 @@ describe "Plot", ->
       @p.width = 4
       @p.height = 2
       plot_view = new @p.default_view({ model: @p, parent: null })
-      plot_view.el = {'parentNode': {'clientWidth': 56, 'clientHeight': 49}}
+      plot_view.el = {'parentElement': {'clientWidth': 56, 'clientHeight': 49}}
       [w, h] = plot_view.get_width_height()
       expect(w).to.be.equal 56
       expect(h).to.be.equal 56 / (4/2)
@@ -93,7 +93,7 @@ describe "Plot", ->
       @p.width = 3
       @p.height = 5
       plot_view = new @p.default_view({ model: @p, parent: null })
-      plot_view.el = {'parentNode': {'clientWidth': 56, 'clientHeight': 49}}
+      plot_view.el = {'parentElement': {'clientWidth': 56, 'clientHeight': 49}}
       [w, h] = plot_view.get_width_height()
       expect(h).to.be.equal 49
       expect(w).to.be.equal 49 * (3/5)
@@ -133,9 +133,6 @@ describe "Plot", ->
     beforeEach ->
       utils.stub_canvas()
       utils.stub_solver()
-
-    it "should have _horizontal set to true by default", sinon.test () ->
-      expect(@p._horizontal).to.true
 
     it "should have a PlotCanvas set on initialization with plot on it", sinon.test () ->
       expect(@p.plot_canvas).to.exist

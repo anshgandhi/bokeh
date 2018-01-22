@@ -8,6 +8,7 @@ dom = utils.require("core/dom")
 {CrosshairTool} = utils.require("models/tools/inspectors/crosshair_tool")
 {PanTool} = utils.require("models/tools/gestures/pan_tool")
 {PolySelectTool} = utils.require("models/tools/gestures/poly_select_tool")
+{SelectTool, SelectToolView} = utils.require("models/tools/gestures/select_tool")
 {TapTool} = utils.require("models/tools/gestures/tap_tool")
 {WheelZoomTool} = utils.require("models/tools/gestures/wheel_zoom_tool")
 
@@ -30,26 +31,28 @@ describe "ui_events module", ->
     utils.stub_canvas()
     sinon.stub(UIEvents.prototype, "_configure_hammerjs")
 
-    @toolbar = new Toolbar()
-    canvas = new Canvas()
-    canvas.document = new Document()
+    doc = new Document()
     @plot = new Plot({
       x_range: new Range1d({start: 0, end: 1})
       y_range: new Range1d({start: 0, end: 1})
-      toolbar: @toolbar
     })
-    @plot_view = new @plot.default_view({model: @plot, parent: null})
-    canvas.document.add_root(@plot)
-    @plot.plot_canvas.attach_document(canvas.document)
-    @plot_canvas_view = new @plot.plot_canvas.default_view({ model: @plot.plot_canvas, parent: @plot_view })
+    doc.add_root(@plot)
+    plot_view = new @plot.default_view({model: @plot, parent: null})
+    @plot_canvas_view = plot_view.plot_canvas_view
     @ui_events = @plot_canvas_view.ui_event_bus
 
   describe "_trigger method", ->
+
+    afterEach ->
+      @spy_trigger.restore()
 
     beforeEach ->
       @spy_trigger = sinon.spy(@ui_events, "trigger")
 
     describe "base_type=move", ->
+
+      afterEach ->
+        @spy_cursor.restore()
 
       beforeEach ->
         @e = new Event("move")
@@ -170,6 +173,10 @@ describe "ui_events module", ->
 
     describe "base_type=scroll", ->
 
+      afterEach ->
+        @preventDefault.restore()
+        @stopPropagation.restore()
+
       beforeEach ->
         @e = new Event("scroll")
         @e.bokeh = {}
@@ -224,6 +231,7 @@ describe "ui_events module", ->
 
     afterEach ->
       @dom_stub.restore()
+      @spy.restore()
 
     beforeEach ->
       @dom_stub = sinon.stub(dom, "offset").returns({top: 0, left: 0})
@@ -266,6 +274,8 @@ describe "ui_events module", ->
 
     afterEach ->
       @dom_stub.restore()
+      @spy_plot.restore()
+      @spy_uievent.restore()
 
     beforeEach ->
       @dom_stub = sinon.stub(dom, "offset").returns({top: 0, left: 0})
@@ -319,7 +329,7 @@ describe "ui_events module", ->
 
       @ui_events._pan_start(e)
 
-      assert(@spy_plot.calledOnce)
+      assert(@spy_plot.called)
       assert(@spy_uievent.calledOnce)
 
     it "_pan method should handle pan event", ->
@@ -332,10 +342,10 @@ describe "ui_events module", ->
 
       @ui_events._pan(e)
 
-      assert(@spy_plot.calledOnce)
+      assert(@spy_plot.called)
       assert(@spy_uievent.calledOnce)
 
-    it "_pan_end method should handle pan event", ->
+    it "_pan_end method should handle pan end event", ->
       e = new Event("panend")
       e.pointerType = "mouse"
       e.srcEvent = {pageX: 100, pageY: 200}
@@ -451,7 +461,7 @@ describe "ui_events module", ->
 
       @ui_events._mouse_wheel(e)
 
-      assert(@spy_plot.calledOnce)
+      assert(@spy_plot.called)
       assert(@spy_uievent.calledOnce)
 
     # not implemented as tool method or BokehEvent
@@ -469,3 +479,31 @@ describe "ui_events module", ->
       # assert(@spy_plot.calledOnce)
       # This is a event on select tools that should probably be removed
       assert(@spy_uievent.calledOnce)
+
+    it "multi-gesture tool should receive multiple events", ->
+      class MultiToolView extends SelectToolView
+        _tap: (e) ->
+        _pan: (e) ->
+
+      class MultiTool extends SelectTool
+        default_view: MultiToolView
+        type: "MultiTool"
+        tool_name: "Multi Tool"
+        event_type: ["tap", "pan"]
+
+      tool = new MultiTool()
+      @plot.add_tools(tool)
+      tool.active = true
+
+      etap = new Event("tap")
+      etap.pointerType = "mouse"
+      etap.srcEvent = {pageX: 100, pageY: 200}
+
+      @ui_events._tap(etap)
+      assert(@spy_uievent.calledOnce, "Tap event not triggered")
+
+      epan = new Event("pan")
+      epan.pointerType = "mouse"
+      epan.srcEvent = {pageX: 100, pageY: 200}
+      @ui_events._pan(epan)
+      assert(@spy_uievent.calledTwice, "Pan event not triggered")
