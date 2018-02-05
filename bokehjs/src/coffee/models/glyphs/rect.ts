@@ -1,10 +1,14 @@
 /* XXX: partial */
 import {XYGlyph, XYGlyphView} from "./xy_glyph";
+import {DistanceSpec, AngleSpec} from "core/vectorization"
+import {LineMixinVector, FillMixinVector} from "core/property_mixins"
 import * as hittest from "core/hittest";
 import * as p from "core/properties";
 import {max} from "core/util/array";
+import {Context2d} from "core/util/canvas"
 
 export class RectView extends XYGlyphView {
+  model: Rect
 
   _set_data() {
     this.max_w2 = 0;
@@ -51,7 +55,7 @@ export class RectView extends XYGlyphView {
     })());
   }
 
-  _render(ctx, indices, {sx, sy, sx0, sy1, sw, sh, _angle}) {
+  _render(ctx: Context2d, indices, {sx, sy, sx0, sy1, sw, sh, _angle}) {
     if (this.visuals.fill.doit) {
       for (const i of indices) {
         if (isNaN(sx[i] + sy[i] + sx0[i] + sy1[i] + sw[i] + sh[i] + _angle[i])) {
@@ -143,7 +147,7 @@ export class RectView extends XYGlyphView {
     const hits = [];
 
     const bbox = hittest.validate_bbox_coords([x0, x1], [y0, y1]);
-    for (let i of this.index.indices(bbox)) {
+    for (const i of this.index.indices(bbox)) {
       let height_in, width_in;
       if (this._angle[i]) {
         const s = Math.sin(-this._angle[i]);
@@ -241,7 +245,7 @@ export class RectView extends XYGlyphView {
     })());
   }
 
-  draw_legend_for_index(ctx, x0, x1, y0, y1, index) {
+  draw_legend_for_index(ctx: Context2d, x0, x1, y0, y1, index) {
     return this._generic_area_legend(ctx, x0, x1, y0, y1, index);
   }
 
@@ -250,19 +254,38 @@ export class RectView extends XYGlyphView {
   }
 }
 
-export class Rect extends XYGlyph {
-  static initClass() {
-    this.prototype.default_view = RectView;
+export namespace Rect {
+  export interface Mixins extends LineMixinVector, FillMixinVector {}
 
+  export interface Attrs extends XYGlyph.Attrs, Mixins {
+    angle: AngleSpec
+    width: DistanceSpec
+    height: DistanceSpec
+    dilate: boolean
+  }
+
+  export interface Opts extends XYGlyph.Opts {}
+}
+
+export interface Rect extends Rect.Attrs {}
+
+export class Rect extends XYGlyph {
+
+  constructor(attrs?: Partial<Rect.Attrs>, opts?: Rect.Opts) {
+    super(attrs, opts)
+  }
+
+  static initClass() {
     this.prototype.type = 'Rect';
+    this.prototype.default_view = RectView;
 
     this.mixins(['line', 'fill']);
     this.define({
-        angle:  [ p.AngleSpec,   0     ],
-        width:  [ p.DistanceSpec       ],
-        height: [ p.DistanceSpec       ],
-        dilate: [ p.Bool,        false ]
-      });
+      angle:  [ p.AngleSpec,   0     ],
+      width:  [ p.DistanceSpec       ],
+      height: [ p.DistanceSpec       ],
+      dilate: [ p.Bool,        false ],
+    });
   }
 }
 Rect.initClass();

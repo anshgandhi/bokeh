@@ -8,6 +8,7 @@ import {Model} from "../../../model";
 import {DTINDEX_NAME} from "./data_table"
 
 export abstract class CellEditorView extends DOMView {
+  model: CellEditor
 
   defaultValue: any
 
@@ -106,6 +107,7 @@ export class CellEditor extends Model {
 CellEditor.initClass();
 
 export class StringEditorView extends CellEditorView {
+  model: StringEditor
 
   get emptyValue() {
     return ""
@@ -137,13 +139,15 @@ export class StringEditor extends CellEditor {
     this.prototype.type = 'StringEditor';
     this.prototype.default_view = StringEditorView;
     this.define({
-      completions: [ p.Array, [] ]
+      completions: [ p.Array, [] ],
     });
   }
 }
 StringEditor.initClass();
 
 export class TextEditorView extends CellEditorView {
+  model: TextEditor
+
   protected _createInput() {
     return textarea()
   }
@@ -158,6 +162,7 @@ export class TextEditor extends CellEditor {
 TextEditor.initClass();
 
 export class SelectEditorView extends CellEditorView {
+  model: SelectEditor
 
   protected _createInput() {
     return select()
@@ -181,13 +186,15 @@ export class SelectEditor extends CellEditor {
     this.prototype.type = 'SelectEditor';
     this.prototype.default_view = SelectEditorView;
     this.define({
-      options: [ p.Array, [] ]
+      options: [ p.Array, [] ],
     });
   }
 }
 SelectEditor.initClass();
 
 export class PercentEditorView extends CellEditorView {
+  model: PercentEditor
+
   protected _createInput() {
     return input({type: "text"})
   }
@@ -202,6 +209,7 @@ export class PercentEditor extends CellEditor {
 PercentEditor.initClass();
 
 export class CheckboxEditorView extends CellEditorView {
+  model: CheckboxEditor
 
   protected _createInput() {
     return input({type: "checkbox", value: "true"})
@@ -228,6 +236,7 @@ export class CheckboxEditor extends CellEditor {
 CheckboxEditor.initClass();
 
 export class IntEditorView extends CellEditorView {
+  model: IntEditor
 
   protected _createInput() {
     return input({type: "text"})
@@ -268,13 +277,14 @@ export class IntEditor extends CellEditor {
     this.prototype.type = 'IntEditor';
     this.prototype.default_view = IntEditorView;
     this.define({
-      step: [ p.Number, 1 ]
+      step: [ p.Number, 1 ],
     });
   }
 }
 IntEditor.initClass();
 
 export class NumberEditorView extends CellEditorView {
+  model: NumberEditor
 
   protected _createInput() {
     return input({type: "text"})
@@ -315,13 +325,15 @@ export class NumberEditor extends CellEditor {
     this.prototype.type = 'NumberEditor';
     this.prototype.default_view = NumberEditorView;
     this.define({
-      step: [ p.Number, 0.01 ]
+      step: [ p.Number, 0.01 ],
     });
   }
 }
 NumberEditor.initClass();
 
 export class TimeEditorView extends CellEditorView {
+  model: TimeEditor
+
   protected _createInput() {
     return input({type: "text"})
   }
@@ -336,6 +348,7 @@ export class TimeEditor extends CellEditor {
 TimeEditor.initClass();
 
 export class DateEditorView extends CellEditorView {
+  model: DateEditor
 
   protected _createInput() {
     return input({type: "text"})

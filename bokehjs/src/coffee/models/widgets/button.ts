@@ -14,20 +14,32 @@ export class ButtonView extends AbstractButtonView {
   }
 }
 
+export namespace Button {
+  export interface Attrs extends AbstractButton.Attrs {
+    clicks: number
+  }
+
+  export interface Opts extends AbstractButton.Opts {}
+}
+
+export interface Button extends Button.Attrs {}
+
 export class Button extends AbstractButton {
+
+  constructor(attrs?: Partial<Button.Attrs>, opts?: Button.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "Button"
     this.prototype.default_view = ButtonView
 
     this.define({
-      clicks: [ p.Number, 0 ]
+      clicks: [ p.Number, 0 ],
     })
 
     register_with_event(ButtonClick, this)
   }
-
-  clicks: number
 }
 
 Button.initClass()

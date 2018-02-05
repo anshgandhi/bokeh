@@ -1,15 +1,6 @@
 /* XXX: partial */
-/*
- * decaffeinate suggestions:
- * DS101: Remove unnecessary use of Array.from
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS206: Consider reworking classes to avoid initClass
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
- */
-
 import * as p from "core/properties";
+import {Location} from "core/enums"
 import {empty} from "core/dom";
 import {logger} from "core/logging"
 import {any, sortBy, includes} from "core/util/array";
@@ -24,13 +15,26 @@ import {ToolProxy} from "./tool_proxy";
 import {LayoutDOM, LayoutDOMView} from "../layouts/layout_dom";
 import {build_views, remove_views} from "core/build_views"
 
+export namespace ProxyToolbar {
+  export interface Attrs extends ToolbarBase.Attrs {}
+
+  export interface Opts extends ToolbarBase.Opts {}
+}
+
+export interface ProxyToolbar extends ProxyToolbar.Attrs {}
+
 export class ProxyToolbar extends ToolbarBase {
+
+  constructor(attrs?: Partial<ProxyToolbar.Attrs>, opts?: ProxyToolbar.Opts) {
+    super(attrs, opts)
+  }
+
   static initClass() {
     this.prototype.type = 'ProxyToolbar';
   }
 
-  initialize(options: any): void {
-    super.initialize(options);
+  initialize(): void {
+    super.initialize();
     this._init_tools();
     this._merge_tools();
   }
@@ -160,7 +164,7 @@ export class ProxyToolbar extends ToolbarBase {
         continue;
       }
       this.gestures[et].tools = sortBy(tools, tool => tool.default_order);
-      if (!(et == 'pinch' || et == 'scroll'))
+      if (!(et == 'pinch' || et == 'scroll' || et == 'multi'))
         this.gestures[et].tools[0].active = true;
     }
   }
@@ -168,6 +172,7 @@ export class ProxyToolbar extends ToolbarBase {
 ProxyToolbar.initClass();
 
 export class ToolbarBoxView extends LayoutDOMView {
+  model: ToolbarBox
 
   initialize(options: any): void {
     super.initialize(options);
@@ -204,14 +209,30 @@ export class ToolbarBoxView extends LayoutDOMView {
   }
 }
 
+export namespace ToolbarBox {
+  export interface Attrs extends LayoutDOM.Attrs {
+    toolbar: ToolbarBase
+    toolbar_location: Location
+  }
+
+  export interface Opts extends LayoutDOM.Opts {}
+}
+
+export interface ToolbarBox extends ToolbarBox.Attrs {}
+
 export class ToolbarBox extends LayoutDOM {
+
+  constructor(attrs?: Partial<ToolbarBox.Attrs>, opts?: ToolbarBox.Opts) {
+    super(attrs, opts)
+  }
+
   static initClass() {
     this.prototype.type = 'ToolbarBox';
     this.prototype.default_view = ToolbarBoxView;
 
     this.define({
-      toolbar: [ p.Instance ],
-      toolbar_location: [ p.Location, "right" ]
+      toolbar:          [ p.Instance          ],
+      toolbar_location: [ p.Location, "right" ],
     });
   }
 

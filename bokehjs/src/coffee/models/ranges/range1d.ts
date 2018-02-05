@@ -1,7 +1,25 @@
 import {Range} from "./range"
 import * as p from "core/properties"
 
+export namespace Range1d {
+  export interface Attrs extends Range.Attrs {
+    start: number
+    end: number
+    bounds: [number, number] | "auto"
+    min_interval: number
+    max_interval: number
+  }
+
+  export interface Opts extends Range.Opts {}
+}
+
+export interface Range1d extends Range1d.Attrs {}
+
 export class Range1d extends Range {
+
+  constructor(attrs?: Partial<Range1d.Attrs>, opts?: Range1d.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "Range1d"
@@ -15,10 +33,6 @@ export class Range1d extends Range {
     })
   }
 
-  bounds: [number, number] | "auto"
-  min_interval: number
-  max_interval: number
-
   protected _initial_start: number
   protected _initial_end: number
 
@@ -30,8 +44,8 @@ export class Range1d extends Range {
     }
   }
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
 
     this._initial_start = this.start
     this._initial_end = this.end

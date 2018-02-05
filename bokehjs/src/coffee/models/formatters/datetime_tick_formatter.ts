@@ -16,7 +16,7 @@ const _us = t =>
   // microsecond / millisecond tick.
   Math.round(((t / 1000) % 1) * 1000000)
 
-const _array = t => tz(t, "%Y %m %d %H %M %S").split(/\s+/).map( e => parseInt(e, 10));
+const _array = t => tz(t, "%Y %m %d %H %M %S").split(/\s+/).map(e => parseInt(e, 10));
 
 const _strftime = function(t, format) {
   if (isFunction(format)) {
@@ -40,7 +40,31 @@ const _strftime = function(t, format) {
   }
 };
 
+export namespace DatetimeTickFormatter {
+  export interface Attrs extends TickFormatter.Attrs {
+    microseconds: string[]
+    milliseconds: string[]
+    seconds: string[]
+    minsec: string[]
+    minutes: string[]
+    hourmin: string[]
+    hours: string[]
+    days: string[]
+    months: string[]
+    years: string[]
+  }
+
+  export interface Opts extends TickFormatter.Opts {}
+}
+
+export interface DatetimeTickFormatter extends DatetimeTickFormatter.Attrs {}
+
 export class DatetimeTickFormatter extends TickFormatter {
+
+  constructor(attrs?: Partial<DatetimeTickFormatter.Attrs>, opts?: DatetimeTickFormatter.Opts) {
+    super(attrs, opts)
+  }
+
   static initClass() {
     this.prototype.type = 'DatetimeTickFormatter';
 
@@ -54,20 +78,20 @@ export class DatetimeTickFormatter extends TickFormatter {
       hours:        [ p.Array, ['%Hh', '%H:%M'] ],
       days:         [ p.Array, ['%m/%d', '%a%d'] ],
       months:       [ p.Array, ['%m/%Y', '%b%y'] ],
-      years:        [ p.Array, ['%Y'] ]
+      years:        [ p.Array, ['%Y'] ],
     });
 
     // Labels of time units, from finest to coarsest.
     this.prototype.format_order = [
-      'microseconds', 'milliseconds', 'seconds', 'minsec', 'minutes', 'hourmin', 'hours', 'days', 'months', 'years'
+      'microseconds', 'milliseconds', 'seconds', 'minsec', 'minutes', 'hourmin', 'hours', 'days', 'months', 'years',
     ];
 
     // Whether or not to strip the leading zeros on tick labels.
     this.prototype.strip_leading_zeros = true;
   }
 
-  initialize(options: any): void {
-    super.initialize(options);
+  initialize(): void {
+    super.initialize();
     // TODO (bev) trigger update on format change
     this._update_width_formats();
   }
@@ -91,7 +115,7 @@ export class DatetimeTickFormatter extends TickFormatter {
       hours:        _widths(this.hours),
       days:         _widths(this.days),
       months:       _widths(this.months),
-      years:        _widths(this.years)
+      years:        _widths(this.years),
     };
   }
 

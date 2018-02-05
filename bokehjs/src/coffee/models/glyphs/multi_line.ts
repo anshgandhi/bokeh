@@ -1,11 +1,16 @@
 /* XXX: partial */
 import {RBush} from "core/util/spatial";
+import {NumberSpec} from "core/vectorization"
+import {LineMixinVector} from "core/property_mixins"
 import * as hittest from "core/hittest";
+import {keys} from "core/util/object";
 import {min, max} from "core/util/array";
 import {isStrictNaN} from "core/util/types";
+import {Context2d} from "core/util/canvas"
 import {Glyph, GlyphView} from "./glyph"
 
 export class MultiLineView extends GlyphView {
+  model: MultiLine
 
   _index_data() {
     const points = [];
@@ -35,14 +40,14 @@ export class MultiLineView extends GlyphView {
         minY: min(ys),
         maxX: max(xs),
         maxY: max(ys),
-        i
+        i,
       });
     }
 
     return new RBush(points);
   }
 
-  _render(ctx, indices, {sxs, sys}) {
+  _render(ctx: Context2d, indices, {sxs, sys}) {
     for (const i of indices) {
       const [sx, sy] = [sxs[i], sys[i]];
 
@@ -86,7 +91,7 @@ export class MultiLineView extends GlyphView {
       }
     }
 
-    result['1d'].indices = hits.map((i) => parseInt(i))
+    result['1d'].indices = keys(hits).map(parseInt)
     result['2d'].indices = hits;
 
     return result;
@@ -118,7 +123,7 @@ export class MultiLineView extends GlyphView {
       }
     }
 
-    result['1d'].indices = hits.map((i) => parseInt(i))
+    result['1d'].indices = keys(hits).map(parseInt)
     result['2d'].indices = hits;
 
     return result;
@@ -146,16 +151,33 @@ export class MultiLineView extends GlyphView {
     return [res.x, res.y];
   }
 
-  draw_legend_for_index(ctx, x0, x1, y0, y1, index) {
+  draw_legend_for_index(ctx: Context2d, x0, x1, y0, y1, index) {
     return this._generic_line_legend(ctx, x0, x1, y0, y1, index);
   }
 }
 
-export class MultiLine extends Glyph {
-  static initClass() {
-    this.prototype.default_view = MultiLineView;
+export namespace MultiLine {
+  export interface Mixins extends LineMixinVector {}
 
+  export interface Attrs extends Glyph.Attrs, Mixins {
+    xs: NumberSpec
+    ys: NumberSpec
+  }
+
+  export interface Opts extends Glyph.Opts {}
+}
+
+export interface MultiLine extends MultiLine.Attrs {}
+
+export class MultiLine extends Glyph {
+
+  constructor(attrs?: Partial<MultiLine.Attrs>, opts?: MultiLine.Opts) {
+    super(attrs, opts)
+  }
+
+  static initClass() {
     this.prototype.type = 'MultiLine';
+    this.prototype.default_view = MultiLineView;
 
     this.coords([['xs', 'ys']]);
     this.mixins(['line']);

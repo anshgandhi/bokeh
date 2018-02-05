@@ -1,10 +1,26 @@
 /* XXX: partial */
 import {Model} from "../../model"
 
-export class Expression extends Model {
+export namespace Expression {
+  export interface Attrs extends Model.Attrs {}
 
-  initialize(options: any): void {
-    super.initialize(options);
+  export interface Opts extends Model.Opts {}
+}
+
+export interface Expression extends Expression.Attrs {}
+
+export abstract class Expression extends Model {
+
+  constructor(attrs?: Partial<Expression.Attrs>, opts?: Expression.Opts) {
+    super(attrs, opts)
+  }
+
+  static initClass() {
+    this.prototype.type = "Expression"
+  }
+
+  initialize(): void {
+    super.initialize();
     this._connected= {};
     this._result = {};
   }
@@ -23,3 +39,4 @@ export class Expression extends Model {
     return this._result[source.id];
   }
 }
+Expression.initClass()

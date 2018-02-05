@@ -6,6 +6,7 @@ import {Variable} from "core/layout/solver"
 import {LayoutDOM, LayoutDOMView} from "../layouts/layout_dom"
 
 export class WidgetBoxView extends LayoutDOMView {
+  model: WidgetBox
 
   connect_signals(): void {
     super.connect_signals()
@@ -84,22 +85,33 @@ export class WidgetBoxView extends LayoutDOMView {
   }
 }
 
+export namespace WidgetBox {
+  export interface Attrs extends LayoutDOM.Attrs {
+    children: LayoutDOM[]
+  }
+
+  export interface Opts extends LayoutDOM.Opts {}
+}
+
+export interface WidgetBox extends WidgetBox.Attrs {}
+
 export class WidgetBox extends LayoutDOM {
+
+  constructor(attrs?: Partial<WidgetBox.Attrs>, opts?: WidgetBox.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "WidgetBox"
-
     this.prototype.default_view = WidgetBoxView
 
     this.define({
-      children: [ p.Array, [] ]
+      children: [ p.Array, [] ],
     })
   }
 
-  children: LayoutDOM[]
-
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
     if (this.sizing_mode == 'fixed' && this.width == null) {
       this.width = 300 // Set a default for fixed.
       logger.info("WidgetBox mode is fixed, but no width specified. Using default of 300.")

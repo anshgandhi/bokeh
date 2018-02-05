@@ -11,7 +11,6 @@ import {DOMView} from "core/dom_view"
 export type Layoutable = LayoutCanvas | LayoutDOM
 
 export abstract class LayoutDOMView extends DOMView {
-
   model: LayoutDOM
 
   protected _solver: Solver
@@ -91,7 +90,7 @@ export abstract class LayoutDOMView extends DOMView {
 
       // stop on first element with sensible dimensions
       const {width, height} = measuring.getBoundingClientRect()
-      if( width != 0 && height != 0)
+      if(width != 0 && height != 0)
         return [width, height]
     }
 
@@ -349,7 +348,25 @@ export abstract class LayoutDOMView extends DOMView {
   }
 }
 
+export namespace LayoutDOM {
+  export interface Attrs extends Model.Attrs {
+    height: number
+    width: number
+    disabled: boolean
+    sizing_mode: SizingMode
+    css_classes: string[]
+  }
+
+  export interface Opts extends Model.Opts {}
+}
+
+export interface LayoutDOM extends LayoutDOM.Attrs {}
+
 export abstract class LayoutDOM extends Model {
+
+  constructor(attrs?: Partial<LayoutDOM.Attrs>, opts?: LayoutDOM.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "LayoutDOM"
@@ -362,12 +379,6 @@ export abstract class LayoutDOM extends Model {
       css_classes: [ p.Array,      []      ],
     })
   }
-
-  height: number
-  width: number
-  disabled: boolean
-  sizing_mode: SizingMode
-  css_classes: string[]
 
   _width: Variable
   _height: Variable
@@ -388,8 +399,8 @@ export abstract class LayoutDOM extends Model {
   _whitespace_left: Variable
   _whitespace_right: Variable
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
     this._width = new Variable(`${this.toString()}.width`)
     this._height = new Variable(`${this.toString()}.height`)
     this._left = new Variable(`${this.toString()}.left`)

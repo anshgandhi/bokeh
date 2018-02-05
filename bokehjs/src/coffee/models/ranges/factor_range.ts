@@ -96,7 +96,36 @@ export function map_three_levels(factors: L3Factor[],
   return [mapping, tops_order, mids_order, (tops_order.length-1)*outer_pad + total_subpad]
 }
 
+export namespace FactorRange {
+  export interface Attrs extends Range.Attrs {
+    factors: Factor[]
+    factor_padding: number
+    subgroup_padding: number
+    group_padding: number
+    range_padding: number
+    range_padding_units: PaddingUnits
+    start: number
+    end: number
+    bounds: [number, number] | "auto"
+    min_interval: any // XXX: what's this
+    max_interval: any // XXX: what's this
+
+    levels: number
+    mids: [string, string][] | undefined
+    tops: string[] | undefined
+    tops_groups: string[]
+  }
+
+  export interface Opts extends Range.Opts {}
+}
+
+export interface FactorRange extends FactorRange.Attrs {}
+
 export class FactorRange extends Range {
+
+  constructor(attrs?: Partial<FactorRange.Attrs>, opts?: FactorRange.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "FactorRange"
@@ -123,23 +152,6 @@ export class FactorRange extends Range {
     })
   }
 
-  factors: Factor[]
-  factor_padding: number
-  subgroup_padding: number
-  group_padding: number
-  range_padding: number
-  range_padding_units: PaddingUnits
-  start: number
-  end: number
-  bounds: [number, number] | "auto"
-  min_interval: any // XXX: what's this
-  max_interval: any // XXX: what's this
-
-  levels: number
-  mids: [string, string][] | undefined
-  tops: string[] | undefined
-  tops_groups: string[]
-
   protected _mapping: L1Mapping | L2Mapping | L3Mapping
 
   get min() {
@@ -150,9 +162,13 @@ export class FactorRange extends Range {
     return this.end
   }
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
     this._init()
+  }
+
+  connect_signals(): void {
+    super.connect_signals()
     this.connect(this.properties.factors.change, () => this.reset())
     this.connect(this.properties.factor_padding.change, () => this.reset())
     this.connect(this.properties.group_padding.change, () => this.reset())

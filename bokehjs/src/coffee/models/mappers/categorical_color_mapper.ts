@@ -17,18 +17,36 @@ const _equals = function(a, b) {
   return true;
 };
 
+export namespace CategoricalColorMapper {
+  export interface Attrs extends ColorMapper.Attrs {
+    factors: string[]
+    start: number
+    end: number
+  }
+
+  export interface Opts extends ColorMapper.Opts {}
+}
+
+export interface CategoricalColorMapper extends CategoricalColorMapper.Attrs {}
+
 export class CategoricalColorMapper extends ColorMapper {
+
+  constructor(attrs?: Partial<CategoricalColorMapper.Attrs>, opts?: CategoricalColorMapper.Opts) {
+    super(attrs, opts)
+  }
+
   static initClass() {
     this.prototype.type = "CategoricalColorMapper";
 
     this.define({
       factors: [ p.Array     ],
       start:   [ p.Number, 0 ],
-      end:     [ p.Number    ]
+      end:     [ p.Number    ],
     });
   }
 
-  _get_values(data, palette) {
+  // XXX: not really string[], but Factor[]. This needs to be clarified across the repo.
+  _get_values(data: string[], palette: number[], _image_glyph: boolean = false): number[] {
     const values = [];
 
     for (let d of data) {

@@ -1,31 +1,54 @@
 /* XXX: partial */
 import * as p from "core/properties";
+import {Color} from "core/types"
 
 import {Transform} from "../transforms/transform";
 import {isNumber} from "core/util/types"
 
-export class ColorMapper extends Transform {
+export namespace ColorMapper {
+  export interface Attrs extends Transform.Attrs {
+    palette: (number | string)[]
+    nan_color: Color
+  }
+
+  export interface Opts extends Transform.Opts {}
+}
+
+export interface ColorMapper extends ColorMapper.Attrs {}
+
+export abstract class ColorMapper extends Transform {
+
+  constructor(attrs?: Partial<ColorMapper.Attrs>, opts?: ColorMapper.Opts) {
+    super(attrs, opts)
+  }
+
   static initClass() {
     this.prototype.type = "ColorMapper";
 
     this.define({
-        palette:       [ p.Any              ], // TODO (bev)
-        nan_color:     [ p.Color, "gray"    ]
-      });
+      palette:   [ p.Any           ], // TODO (bev)
+      nan_color: [ p.Color, "gray" ],
+    });
   }
 
-  initialize(options: any): void {
-    super.initialize(options);
+  protected _little_endian: boolean
+  protected _palette: number[]
+
+  initialize(): void {
+    super.initialize();
     this._little_endian = this._is_little_endian();
     this._palette       = this._build_palette(this.palette);
+  }
 
+  connect_signals(): void {
+    super.connect_signals()
     this.connect(this.change, function() {
       this._palette = this._build_palette(this.palette);
     });
   }
 
   // TODO (bev) This should not be needed, everything should use v_compute
-  v_map_screen(data, image_glyph = false) {
+  v_map_screen(data, image_glyph: boolean = false) {
     const values = this._get_values(data, this._palette, image_glyph);
     const buf = new ArrayBuffer(data.length * 4);
     if (this._little_endian) {
@@ -57,14 +80,10 @@ export class ColorMapper extends Transform {
   }
 
   v_compute(xs) {
-    const values = this._get_values(xs, this.palette);
-    return values;
+    return this._get_values(xs, this.palette);
   }
 
-  _get_values(_data, _palette, _image_glyph = false) {
-    // Should be defined by subclass
-    return [];
-  }
+  abstract _get_values(data: number[] | string[], palette: number[], image_glyph?: boolean): number[]
 
   _is_little_endian() {
     const buf = new ArrayBuffer(4);
@@ -79,7 +98,7 @@ export class ColorMapper extends Transform {
     return little_endian;
   }
 
-  _build_palette(palette) {
+  _build_palette(palette): number[] {
     const new_palette = new Uint32Array(palette.length);
     const _convert = function(value) {
       if (isNumber(value)) {

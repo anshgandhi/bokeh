@@ -2,15 +2,19 @@
 import {Renderer, RendererView} from "./renderer";
 import {Glyph} from "../glyphs/glyph";
 import {LineView} from "../glyphs/line";
-import {DataSource} from "../sources/data_source";
+import {ColumnarDataSource} from "../sources/columnar_data_source";
 import {RemoteDataSource} from "../sources/remote_data_source";
 import {CDSView} from "../sources/cds_view";
 import {logger} from "core/logging";
 import * as p from "core/properties";
 import {difference, includes, range} from "core/util/array";
 import {extend, clone} from "core/util/object"
+import {Context2d} from "core/util/canvas"
+import {SelectionManager} from "core/selection_manager"
+import {FactorRange} from '../ranges/factor_range';
 
 export class GlyphRendererView extends RendererView {
+  model: GlyphRenderer
 
   initialize(options: any): void {
     super.initialize(options);
@@ -25,7 +29,7 @@ export class GlyphRendererView extends RendererView {
       const attrs = clone(glyph_attrs);
       if (has_fill) { extend(attrs, defaults.fill); }
       if (has_line) { extend(attrs, defaults.line); }
-      return new (base_glyph.constructor)(attrs);
+      return new (base_glyph.constructor as any)(attrs);
     };
 
     this.glyph = this.build_glyph_view(base_glyph);
@@ -92,12 +96,14 @@ export class GlyphRendererView extends RendererView {
 
     for (const name in x_ranges) {
       const rng = x_ranges[name];
-      this.connect(rng.change, () => this.set_data())
+      if (rng instanceof FactorRange)
+        this.connect(rng.change, () => this.set_data())
     }
 
     for (const name in y_ranges) {
       const rng = y_ranges[name];
-      this.connect(rng.change, () => this.set_data())
+      if (rng instanceof FactorRange)
+        this.connect(rng.change, () => this.set_data())
     }
 
     this.connect(this.model.glyph.transformchange, () => this.set_data())
@@ -173,18 +179,19 @@ export class GlyphRendererView extends RendererView {
     ctx.save();
 
     // selected is in full set space
-    let { selected } = this.model.data_source;
-    if (!selected || (selected.length === 0)) {
+    const {selected: _selected} = this.model.data_source;
+    let selected: number[]
+    if (!_selected || (_selected.length === 0)) {
       selected = [];
     } else {
-      if (selected['0d'].glyph) {
+      if (_selected['0d'].glyph) {
         selected = this.model.view.convert_indices_from_subset(indices);
-      } else if (selected['1d'].indices.length > 0) {
-        selected = selected['1d'].indices;
+      } else if (_selected['1d'].indices.length > 0) {
+        selected = _selected['1d'].indices;
       } else {
         selected = ((() => {
           const result = [];
-          for (const i of Object.keys(selected["2d"].indices)) {
+          for (const i of Object.keys(_selected["2d"].indices)) {
             result.push(parseInt(i));
           }
           return result;
@@ -317,7 +324,7 @@ export class GlyphRendererView extends RendererView {
     return ctx.restore();
   }
 
-  draw_legend(ctx, x0, x1, y0, y1, field, label) {
+  draw_legend(ctx: Context2d, x0, x1, y0, y1, field, label) {
     const index = this.model.get_reference_point(field, label);
     return this.glyph.draw_legend_for_index(ctx, x0, x1, y0, y1, index);
   }
@@ -327,23 +334,34 @@ export class GlyphRendererView extends RendererView {
   }
 }
 
+export namespace GlyphRenderer {
+  export interface Attrs extends Renderer.Attrs {
+    x_range_name: string
+    y_range_name: string
+    data_source: ColumnarDataSource
+    view: CDSView
+    glyph: Glyph
+    hover_glyph: Glyph
+    nonselection_glyph: Glyph | "auto"
+    selection_glyph: Glyph | "auto"
+    muted_glyph: Glyph
+    muted: boolean
+  }
+
+  export interface Opts extends Renderer.Opts {}
+}
+
+export interface GlyphRenderer extends GlyphRenderer.Attrs {}
+
 export class GlyphRenderer extends Renderer {
 
-  x_range_name: string
-  y_range_name: string
-  data_source: DataSource
-  view: CDSView
-  glyph: Glyph
-  hover_glyph: Glyph
-  nonselection_glyph: Glyph | "auto"
-  selection_glyph: Glyph | "auto"
-  muted_glyph: Glyph
-  muted: boolean
+  constructor(attrs?: Partial<GlyphRenderer.Attrs>, opts?: GlyphRenderer.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
-    this.prototype.default_view = GlyphRendererView;
-
     this.prototype.type = 'GlyphRenderer';
+    this.prototype.default_view = GlyphRendererView;
 
     this.define({
         x_range_name:       [ p.String,  'default' ],
@@ -355,11 +373,11 @@ export class GlyphRenderer extends Renderer {
         nonselection_glyph: [ p.Any,      'auto'   ], // Instance or "auto"
         selection_glyph:    [ p.Any,      'auto'   ], // Instance or "auto"
         muted_glyph:        [ p.Instance           ],
-        muted:              [ p.Bool,        false ]
+        muted:              [ p.Bool,        false ],
       });
 
     this.override({
-      level: 'glyph'
+      level: 'glyph',
     });
 
     this.prototype.selection_defaults = {fill: {}, line: {}};
@@ -367,8 +385,8 @@ export class GlyphRenderer extends Renderer {
     this.prototype.nonselection_defaults = {fill: {fill_alpha: 0.2, line_alpha: 0.2}, line: {}};
   }
 
-  initialize(options: any): void {
-    super.initialize(options);
+  initialize(): void {
+    super.initialize();
 
     if ((this.view.source == null)) {
       this.view.source = this.data_source;
@@ -420,7 +438,7 @@ export class GlyphRenderer extends Renderer {
     return !indices.is_empty();
   }
 
-  get_selection_manager() {
+  get_selection_manager(): SelectionManager {
     return this.data_source.selection_manager;
   }
 }

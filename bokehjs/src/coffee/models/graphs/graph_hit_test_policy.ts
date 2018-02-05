@@ -14,7 +14,6 @@ export class GraphHitTestPolicy extends Model {
   }
 }
 
-
 export class NodesOnly extends GraphHitTestPolicy {
   static initClass() {
     this.prototype.type = 'NodesOnly';
@@ -53,7 +52,6 @@ export class NodesOnly extends GraphHitTestPolicy {
 }
 NodesOnly.initClass();
 
-
 export class NodesAndLinkedEdges extends GraphHitTestPolicy {
   static initClass() {
     this.prototype.type = 'NodesAndLinkedEdges';
@@ -72,7 +70,7 @@ export class NodesAndLinkedEdges extends GraphHitTestPolicy {
 
     const node_indices = ((() => {
       const result = [];
-      for (let i of hit_test_result["1d"].indices) {
+      for (const i of hit_test_result["1d"].indices) {
         result.push(node_view.model.data_source.data.index[i]);
       }
       return result;

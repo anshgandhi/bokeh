@@ -16,7 +16,7 @@ export class SelectionManager extends HasProps {
     this.prototype.type = "SelectionManager"
 
     this.internal({
-      source: [ p.Any ]
+      source: [ p.Any ],
     })
   }
 
@@ -25,8 +25,8 @@ export class SelectionManager extends HasProps {
   selector: Selector
   inspectors: {[key: string]: HasProps}
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
     this.selector = new Selector()
     this.inspectors = {}
   }
@@ -45,7 +45,7 @@ export class SelectionManager extends HasProps {
     return did_hit
   }
 
-  clear(_rview: RendererView): void {
+  clear(): void {
     this.selector.clear()
     this.source.selected = hittest.create_hit_test_result()
   }

@@ -1,9 +1,12 @@
 /* XXX: partial */
 import {Annotation, AnnotationView} from "./annotation";
+import {LineMixinScalar} from "core/property_mixins"
+import {SpatialUnits, RenderMode, Dimension} from "core/enums"
 import {show, hide} from "core/dom";
 import * as p from "core/properties"
 
 export class SpanView extends AnnotationView {
+  model: Span
 
   initialize(options: any): void {
     super.initialize(options);
@@ -103,34 +106,53 @@ export class SpanView extends AnnotationView {
   }
 }
 
+export namespace Span {
+  export interface Mixins extends LineMixinScalar {}
+
+  export interface Attrs extends Annotation.Attrs, Mixins {
+    render_mode: RenderMode
+    x_range_name: string
+    y_range_name: string
+    location: number | null
+    location_units: SpatialUnits
+    dimension: Dimension
+    for_hover: boolean
+    computed_location: number | null
+  }
+
+  export interface Opts extends Annotation.Opts {}
+}
+
+export interface Span extends Span.Attrs {}
+
 export class Span extends Annotation {
 
-  computed_location: number | null
+  constructor(attrs?: Partial<Span.Attrs>, opts?: Span.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
-
-    this.prototype.default_view = SpanView;
-
     this.prototype.type = 'Span';
+    this.prototype.default_view = SpanView;
 
     this.mixins(['line']);
 
     this.define({
-        render_mode:    [ p.RenderMode,   'canvas'  ],
-        x_range_name:   [ p.String,       'default' ],
-        y_range_name:   [ p.String,       'default' ],
-        location:       [ p.Number,       null      ],
-        location_units: [ p.SpatialUnits, 'data'    ],
-        dimension:      [ p.Dimension,    'width'   ]
+      render_mode:    [ p.RenderMode,   'canvas'  ],
+      x_range_name:   [ p.String,       'default' ],
+      y_range_name:   [ p.String,       'default' ],
+      location:       [ p.Number,       null      ],
+      location_units: [ p.SpatialUnits, 'data'    ],
+      dimension:      [ p.Dimension,    'width'   ],
     });
 
     this.override({
-      line_color: 'black'
+      line_color: 'black',
     });
 
     this.internal({
       for_hover: [ p.Boolean, false ],
-      computed_location: [ p.Number, null ] // absolute screen coordinate
+      computed_location: [ p.Number, null ], // absolute screen coordinate
     });
   }
 }

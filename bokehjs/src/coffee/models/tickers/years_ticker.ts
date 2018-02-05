@@ -2,7 +2,19 @@ import {BasicTicker} from "./basic_ticker"
 import {SingleIntervalTicker} from "./single_interval_ticker"
 import {last_year_no_later_than, ONE_YEAR} from "./util"
 
+export namespace YearsTicker {
+  export interface Attrs extends SingleIntervalTicker.Attrs {}
+
+  export interface Opts extends SingleIntervalTicker.Opts {}
+}
+
+export interface YearsTicker extends YearsTicker.Attrs {}
+
 export class YearsTicker extends SingleIntervalTicker {
+
+  constructor(attrs?: Partial<YearsTicker.Attrs>, opts?: YearsTicker.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "YearsTicker"
@@ -10,8 +22,8 @@ export class YearsTicker extends SingleIntervalTicker {
 
   protected basic_ticker: BasicTicker
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
     this.interval = ONE_YEAR
     this.basic_ticker = new BasicTicker({num_minor_ticks: 0})
   }

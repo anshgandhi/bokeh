@@ -3,10 +3,22 @@ import * as hittest from "core/hittest"
 import * as p from "core/properties"
 import {isFunction} from "core/util/types"
 
-export class DataSource extends Model {
+export namespace DataSource {
+  export interface Attrs extends Model.Attrs {
+    selected: hittest.HitTestResult
+    callback: any // XXX
+  }
 
-  selected: hittest.HitTestResult
-  callback: any // XXX
+  export interface Opts extends Model.Opts {}
+}
+
+export interface DataSource extends DataSource.Attrs {}
+
+export abstract class DataSource extends Model {
+
+  constructor(attrs?: Partial<DataSource.Attrs>, opts?: DataSource.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "DataSource"
@@ -17,8 +29,8 @@ export class DataSource extends Model {
     })
   }
 
-  initialize(options: any): void {
-    super.initialize(options)
+  connect_signals(): void {
+    super.connect_signals()
     this.connect(this.properties.selected.change, () => {
       const {callback} = this
       if (callback != null) {

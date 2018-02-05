@@ -14,6 +14,26 @@ import {isEqual} from './util/eq'
 import {ColumnarDataSource} from "models/sources/columnar_data_source"
 import {Document} from "../document"
 
+export module HasProps {
+  export interface Attrs {
+    id: string
+  }
+
+  export interface Opts {
+    defer_initialization?: boolean
+  }
+
+  export interface SetOptions {
+    check_eq?: boolean
+    silent?: boolean
+    no_change?: boolean
+    defaults?: boolean
+    setter_id?: string
+  }
+}
+
+export interface HasProps extends HasProps.Attrs {}
+
 export abstract class HasProps extends Signalable() {
 
   static initClass() {
@@ -23,7 +43,7 @@ export abstract class HasProps extends Signalable() {
     this.prototype.mixins = []
 
     this.define({
-      id: [ p.Any ]
+      id: [ p.Any ],
     })
   }
 
@@ -71,7 +91,7 @@ export abstract class HasProps extends Signalable() {
           return value
         },
         set: function(this: HasProps, value: any): HasProps {
-          this.setv([name, value])
+          this.setv({[name]: value})
           return this
         },
         configurable: false,
@@ -127,7 +147,6 @@ export abstract class HasProps extends Signalable() {
     return `${this.type}(${this.id})`
   }
 
-  id: string
   _subtype: string | undefined = undefined
 
   document: Document | null = null
@@ -141,7 +160,7 @@ export abstract class HasProps extends Signalable() {
 
   protected readonly _set_after_defaults: {[key: string]: boolean} = {}
 
-  constructor(attributes: {[key: string]: any} = {}, options: HasProps.Options = {}) {
+  constructor(attrs: {[key: string]: any} = {}, opts: HasProps.Opts = {}) {
     super()
 
     for (const name in this.props) {
@@ -153,20 +172,20 @@ export abstract class HasProps extends Signalable() {
     }
 
     // auto generating ID
-    if (attributes.id == null)
-      this.setv(["id", uniqueId()], {silent: true})
+    if (attrs.id == null)
+      this.setv({id: uniqueId()}, {silent: true})
 
-    this.setv(attributes, extend({silent: true}, options))
+    this.setv(attrs, {silent: true})
 
     // allowing us to defer initialization when loading many models
     // when loading a bunch of models, we want to do initialization as a second pass
     // because other objects that this one depends on might not be loaded yet
 
-    if (!options.defer_initialization)
-      this.finalize(options)
+    if (!opts.defer_initialization)
+      this.finalize()
   }
 
-  finalize(options: HasProps.Options): void {
+  finalize(): void {
     // This is necessary because the initial creation of properties relies on
     // model.get which is not usable at that point yet in the constructor. This
     // initializer is called when deferred initialization happens for all models
@@ -183,11 +202,11 @@ export abstract class HasProps extends Signalable() {
         this.connect(prop.spec.transform.change, () => this.transformchange.emit(undefined))
     }
 
-    this.initialize(options)
+    this.initialize()
     this.connect_signals()
   }
 
-  initialize(_options: any): void {}
+  initialize(): void {}
 
   connect_signals(): void {}
 
@@ -255,14 +274,7 @@ export abstract class HasProps extends Signalable() {
     this._changing = false
   }
 
-  setv(obj: {[key: string]: any} | [string, any], options: HasProps.SetOptions = {}): void {
-    let attrs: {[key: string]: any} = {}
-    if (isArray(obj)) {
-      const [attr, value] = obj as [string, any]
-      attrs[attr] = value
-    } else
-      attrs = obj
-
+  setv(attrs: {[key: string]: any}, options: HasProps.SetOptions = {}): void {
     for (const key in attrs) {
       if (!attrs.hasOwnProperty(key))
         continue
@@ -333,7 +345,7 @@ export abstract class HasProps extends Signalable() {
       return value.ref()
     else if (isArray(value)) {
       const ref_array: any[] = []
-      for (let i = 0; i < value.length; i++ ) {
+      for (let i = 0; i < value.length; i++) {
         const v = value[i]
         ref_array.push(HasProps._value_to_json(i.toString(), v, value))
       }
@@ -512,19 +524,4 @@ export abstract class HasProps extends Signalable() {
     return data
   }
 }
-
 HasProps.initClass()
-
-export module HasProps {
-  export interface Options {
-    defer_initialization?: boolean
-  }
-
-  export interface SetOptions {
-    check_eq?: boolean
-    silent?: boolean
-    no_change?: boolean
-    defaults?: boolean
-    setter_id?: string
-  }
-}

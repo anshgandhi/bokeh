@@ -96,22 +96,35 @@ export class AutocompleteInputView extends TextInputView {
   }
 }
 
+export namespace AutocompleteInput {
+  export interface Attrs extends TextInput.Attrs {
+    completions: string[]
+  }
+
+  export interface Opts extends TextInput.Opts {}
+}
+
+export interface AutocompleteInput extends AutocompleteInput.Attrs {}
+
 export class AutocompleteInput extends TextInput {
+
+  constructor(attrs?: Partial<AutocompleteInput.Attrs>, opts?: AutocompleteInput.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "AutocompleteInput"
     this.prototype.default_view = AutocompleteInputView
 
     this.define({
-      completions: [ p.Array, [] ]
+      completions: [ p.Array, [] ],
     })
 
     this.internal({
-      active: [p.Boolean, true]
+      active: [p.Boolean, true],
     })
   }
 
-  completions: string[]
   active: boolean
 }
 

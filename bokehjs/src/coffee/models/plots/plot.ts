@@ -1,8 +1,10 @@
 import {EQ, Constraint, Variable} from "core/layout/solver"
 import {logger} from "core/logging"
 import * as p from "core/properties"
+import {Color} from "core/types"
+import {LineJoin, LineCap} from "core/enums"
 import {Place, Location, OutputBackend} from "core/enums"
-import {find, removeBy} from "core/util/array"
+import {find, removeBy, includes} from "core/util/array"
 import {extend, values} from "core/util/object"
 import {isString, isArray} from "core/util/types"
 
@@ -24,7 +26,6 @@ import {Tool} from "../tools/tool"
 import {register_with_event, UIEvent} from 'core/bokeh_events'
 
 export class PlotView extends LayoutDOMView {
-
   model: Plot
 
   connect_signals(): void {
@@ -58,11 +59,97 @@ export class PlotView extends LayoutDOMView {
   }
 }
 
+export namespace Plot {
+  // line:outline_
+  export interface OutlineLine {
+    outline_line_color: Color
+    outline_line_width: number
+    outline_line_alpha: number
+    outline_line_join: LineJoin
+    outline_line_cap: LineCap
+    outline_line_dash: number[]
+    outline_line_dash_offset: number
+  }
+
+  // fill:background_
+  export interface BackgroundFill {
+    background_fill_color: Color
+    background_fill_alpha: number
+  }
+
+  // fill:border_
+  export interface BorderFill {
+    border_fill_color: Color
+    border_fill_alpha: number
+  }
+
+  export interface Mixins extends OutlineLine, BackgroundFill, BorderFill {}
+
+  export interface Attrs extends LayoutDOM.Attrs, Mixins {
+    toolbar: Toolbar
+    toolbar_location: Location | null
+    toolbar_sticky: boolean
+
+    plot_width: number
+    plot_height: number
+
+    title: Title | string | null
+    title_location: Location
+
+    h_symmetry: boolean
+    v_symmetry: boolean
+
+    above: Renderer[]
+    below: Renderer[]
+    left: Renderer[]
+    right: Renderer[]
+
+    renderers: Renderer[]
+
+    x_range: Range
+    extra_x_ranges: {[key: string]: Range}
+    y_range: Range
+    extra_y_ranges: {[key: string]: Range}
+
+    x_scale: Scale
+    y_scale: Scale
+
+    lod_factor: number
+    lod_interval: number
+    lod_threshold: number
+    lod_timeout: number
+
+    hidpi: boolean
+    output_backend: OutputBackend
+
+    min_border: number | null
+    min_border_top: number | null
+    min_border_left: number | null
+    min_border_bottom: number | null
+    min_border_right: number | null
+
+    inner_width: number
+    inner_height: number
+    layout_width: number
+    layout_height: number
+
+    match_aspect: boolean
+    aspect_scale: number
+  }
+
+  export interface Opts extends LayoutDOM.Opts {}
+}
+
+export interface Plot extends Plot.Attrs {}
+
 export class Plot extends LayoutDOM {
+
+  constructor(attrs?: Partial<Plot.Attrs>, opts?: Plot.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "Plot"
-
     this.prototype.default_view = PlotView
 
     this.mixins(["line:outline_", "fill:background_", "fill:border_"])
@@ -128,61 +215,10 @@ export class Plot extends LayoutDOM {
     register_with_event(UIEvent, this)
   }
 
-  toolbar: Toolbar
-  toolbar_location: Location | null
-  toolbar_sticky: boolean
-
-  plot_width: number
-  plot_height: number
-
-  title: Title | string | null
-  title_location: Location
-
-  h_symmetry: boolean
-  v_symmetry: boolean
-
-  above: Renderer[]
-  below: Renderer[]
-  left: Renderer[]
-  right: Renderer[]
-
-  renderers: Renderer[]
-
-  x_range: Range
-  extra_x_ranges: {[key: string]: Range}
-  y_range: Range
-  extra_y_ranges: {[key: string]: Range}
-
-  x_scale: Scale
-  y_scale: Scale
-
-  lod_factor: number
-  lod_interval: number
-  lod_threshold: number
-  lod_timeout: number
-
-  hidpi: boolean
-  output_backend: OutputBackend
-
-  min_border: number | null
-  min_border_top: number | null
-  min_border_left: number | null
-  min_border_bottom: number | null
-  min_border_right: number | null
-
-  inner_width: number
-  inner_height: number
-  layout_width: number
-  layout_height: number
-
-  match_aspect: boolean
-  aspect_scale: number
-
   protected _plot_canvas: PlotCanvas
-  protected _toolbar_panel: ToolbarPanel | null
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
 
     for (const xr of values(this.extra_x_ranges).concat(this.x_range)) {
       let plots = xr.plots
@@ -245,18 +281,19 @@ export class Plot extends LayoutDOM {
   }
 
   protected _init_toolbar_panel(): void {
-    if (this._toolbar_panel != null) {
-      for (const items of [this.left, this.right, this.above, this.below, this.renderers])
-        removeBy(items, (item) => item == this._toolbar_panel)
-      this._toolbar_panel = null
-    }
+    let tpanel = find(this.renderers, (model): model is ToolbarPanel => {
+      return model instanceof ToolbarPanel && includes(model.tags, this.id)
+    })
+
+    if (tpanel != null)
+      this.remove_layout(tpanel)
 
     switch (this.toolbar_location) {
       case "left":
       case "right":
       case "above":
       case "below": {
-        this._toolbar_panel = new ToolbarPanel({toolbar: this.toolbar})
+        tpanel = new ToolbarPanel({toolbar: this.toolbar, tags: [this.id]})
         this.toolbar.toolbar_location = this.toolbar_location
 
         if (this.toolbar_sticky) {
@@ -264,13 +301,13 @@ export class Plot extends LayoutDOM {
           const title = find(models, (model): model is Title => model instanceof Title)
 
           if (title != null) {
-            this._toolbar_panel.set_panel((title as any).panel) // XXX
-            this.add_renderers(this._toolbar_panel)
+            (tpanel as ToolbarPanel).set_panel((title as Title).panel!) // XXX, XXX: because find() doesn't provide narrowed types
+            this.add_renderers(tpanel)
             return
           }
         }
 
-        this.add_layout(this._toolbar_panel, this.toolbar_location)
+        this.add_layout(tpanel, this.toolbar_location)
         break
       }
     }
@@ -307,6 +344,19 @@ export class Plot extends LayoutDOM {
     this.add_renderers(renderer)
   }
 
+  remove_layout(renderer: Renderer): void {
+
+    const del = (items: Renderer[]): void => {
+      removeBy(items, (item) => item == renderer)
+    }
+
+    del(this.left)
+    del(this.right)
+    del(this.above)
+    del(this.below)
+    del(this.renderers)
+  }
+
   add_glyph(glyph: Glyph, source: DataSource = new ColumnDataSource(), extra_attrs: any = {}): GlyphRenderer {
     const attrs = extend({}, extra_attrs, {data_source: source, glyph: glyph})
     const renderer = new GlyphRenderer(attrs)
@@ -316,8 +366,8 @@ export class Plot extends LayoutDOM {
 
   add_tools(...tools: Tool[]): void {
     for (const tool of tools) {
-      if (tool.overlay != null)
-        this.add_renderers(tool.overlay)
+      if ((tool as any).overlay != null) // XXX
+        this.add_renderers((tool as any).overlay)
     }
 
     this.toolbar.tools = this.toolbar.tools.concat(tools)

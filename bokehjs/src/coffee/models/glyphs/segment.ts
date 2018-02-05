@@ -1,9 +1,13 @@
 /* XXX: partial */
 import * as hittest from "core/hittest";
+import {NumberSpec} from "core/vectorization"
+import {LineMixinVector} from "core/property_mixins"
 import {RBush} from "core/util/spatial";
+import {Context2d} from "core/util/canvas"
 import {Glyph, GlyphView} from "./glyph"
 
 export class SegmentView extends GlyphView {
+  model: Segment
 
   _index_data() {
     const points = [];
@@ -14,7 +18,7 @@ export class SegmentView extends GlyphView {
           minY: Math.min(this._y0[i], this._y1[i]),
           maxX: Math.max(this._x0[i], this._x1[i]),
           maxY: Math.max(this._y0[i], this._y1[i]),
-          i
+          i,
         });
       }
     }
@@ -22,7 +26,7 @@ export class SegmentView extends GlyphView {
     return new RBush(points);
   }
 
-  _render(ctx, indices, {sx0, sy0, sx1, sy1}) {
+  _render(ctx: Context2d, indices, {sx0, sy0, sx1, sy1}) {
     if (this.visuals.line.doit) {
       for (const i of indices) {
         if (isNaN(sx0[i]+sy0[i]+sx1[i]+sy1[i])) {
@@ -102,16 +106,35 @@ export class SegmentView extends GlyphView {
     return (this.sy0[i] + this.sy1[i])/2;
   }
 
-  draw_legend_for_index(ctx, x0, x1, y0, y1, index) {
+  draw_legend_for_index(ctx: Context2d, x0, x1, y0, y1, index) {
     return this._generic_line_legend(ctx, x0, x1, y0, y1, index);
   }
 }
 
-export class Segment extends Glyph {
-  static initClass() {
-    this.prototype.default_view = SegmentView;
+export namespace Segment {
+  export interface Mixins extends LineMixinVector {}
 
+  export interface Attrs extends Glyph.Attrs, Mixins {
+    x0: NumberSpec
+    y0: NumberSpec
+    x1: NumberSpec
+    y1: NumberSpec
+  }
+
+  export interface Opts extends Glyph.Opts {}
+}
+
+export interface Segment extends Segment.Attrs {}
+
+export class Segment extends Glyph {
+
+  constructor(attrs?: Partial<Segment.Attrs>, opts?: Segment.Opts) {
+    super(attrs, opts)
+  }
+
+  static initClass() {
     this.prototype.type = 'Segment';
+    this.prototype.default_view = SegmentView;
 
     this.coords([['x0', 'y0'], ['x1', 'y1']]);
     this.mixins(['line']);

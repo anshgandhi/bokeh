@@ -27,7 +27,7 @@ function is_partial(file: string): boolean {
 
 function is_excluded(code: number): boolean {
   const excluded = [
-    2305, 2322, 2339, 2345, 2365,
+    2322, 2339, 2345, 2365,
     2415, 2459, 2461,
     2531, 2532, 2538, 2551,
     2683,
@@ -55,7 +55,7 @@ gulp.task("scripts:ts", () => {
       }
     }
 
-    if (argv.filter && text.includes(argv.filter))
+    if (argv.filter && !text.includes(argv.filter))
       return
 
     gutil.log(err.message)
@@ -88,9 +88,14 @@ gulp.task("scripts:ts", () => {
 })
 
 gulp.task("scripts:tslint", () => {
+  const srcs = [
+    join(paths.src_dir.coffee),
+    join(paths.base_dir, "test"),
+    join(paths.base_dir, "examples"),
+  ]
   return gulp
-    .src(join(paths.src_dir.coffee, "**", "*.ts"))
-    .pipe(tslint({formatter: "verbose"}))
+    .src(srcs.map((dir) => join(dir, "**", "*.ts")))
+    .pipe(tslint({formatter: "stylish", fix: argv.fix || false}))
     .pipe(tslint.report({emitError: false}))
 })
 

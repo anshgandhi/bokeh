@@ -1,18 +1,35 @@
 /* XXX: partial */
 import {Model} from "../../model";
+import {Renderer} from "../renderers/renderer"
+import {ColumnDataSource} from "../sources/column_data_source"
+import {StringSpec} from "core/vectorization"
 import * as p from "core/properties";
 import {logger} from "core/logging";
 import {uniq, includes} from "core/util/array";
-import {ColumnDataSource} from "../../models/sources/column_data_source"
+
+export namespace LegendItem {
+  export interface Attrs extends Model.Attrs {
+    label: StringSpec | null
+    renderers: Renderer[]
+  }
+
+  export interface Opts extends Model.Opts {}
+}
+
+export interface LegendItem extends LegendItem.Attrs {}
 
 export class LegendItem extends Model {
+
+  constructor(attrs?: Partial<LegendItem.Attrs>, opts?: LegendItem.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "LegendItem";
 
     this.define({
-        label: [ p.StringSpec, null ],
-        renderers: [ p.Array, [] ]
+      label: [ p.StringSpec, null ],
+      renderers: [ p.Array, [] ],
     });
   }
 
@@ -49,8 +66,8 @@ export class LegendItem extends Model {
   }
 
 
-  initialize(options: any): void {
-    super.initialize(options);
+  initialize(): void {
+    super.initialize();
     // Validate data_sources match
     const data_source_validation = this._check_data_sources_on_renderers();
     if (!data_source_validation) {

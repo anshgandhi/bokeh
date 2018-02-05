@@ -9,9 +9,21 @@ import {keys, values} from "core/util/object"
 
 // Abstract baseclass for column based data sources, where the column
 // based data may be supplied directly or be computed from an attribute
-export class ColumnarDataSource extends DataSource {
 
-  data: {[key: string]: any}
+export namespace ColumnarDataSource {
+  export interface Attrs extends DataSource.Attrs {
+    column_names: string[]
+    selection_manager: SelectionManager
+  }
+
+  export interface Opts extends DataSource.Opts {}
+}
+
+export interface ColumnarDataSource extends ColumnarDataSource.Attrs {}
+
+export abstract class ColumnarDataSource extends DataSource {
+
+  data: {[key: string]: any[]}
   _shapes: {[key: string]: any}
 
   _select: Signal<any, this>
@@ -20,22 +32,26 @@ export class ColumnarDataSource extends DataSource {
   streaming: Signal<any, this>
   patching: Signal<any, this> // <number[], ColumnarDataSource>
 
+  constructor(attrs?: Partial<ColumnarDataSource.Attrs>, opts?: ColumnarDataSource.Opts) {
+    super(attrs, opts)
+  }
+
   static initClass() {
     this.prototype.type = 'ColumnarDataSource'
 
     this.define({
-      column_names: [ p.Array, [] ]
+      column_names: [ p.Array, [] ],
     })
 
     this.internal({
       selection_manager: [ p.Instance, (self: ColumnarDataSource) => new SelectionManager({source: self}) ],
       inspected:         [ p.Any ],
-      _shapes:           [ p.Any, {}]
+      _shapes:           [ p.Any, {}],
     })
   }
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
 
     this._select = new Signal(this, "select")
     this.inspect = new Signal(this, "inspect") // XXX: <[indices, tool, renderer-view, source, data], this>

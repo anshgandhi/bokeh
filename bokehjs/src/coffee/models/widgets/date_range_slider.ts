@@ -20,18 +20,30 @@ export class DateRangeSliderView extends AbstractSliderView {
   }
 }
 
+export namespace DateRangeSlider {
+  export interface Attrs extends AbstractSlider.Attrs {}
+
+  export interface Opts extends AbstractSlider.Opts {}
+}
+
+export interface DateRangeSlider extends DateRangeSlider.Attrs {}
+
 export class DateRangeSlider extends AbstractSlider {
+
+  constructor(attrs?: Partial<DateRangeSlider.Attrs>, opts?: DateRangeSlider.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "DateRangeSlider"
     this.prototype.default_view = DateRangeSliderView
 
     this.override({
-      format: "%d %b %Y"
+      format: "%d %b %Y",
     })
   }
 
-  behaviour = 'drag'
+  behaviour = "drag" as "drag"
   connected = [false, true, false]
 
   _formatter = tz

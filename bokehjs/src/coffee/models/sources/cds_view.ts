@@ -3,16 +3,35 @@ import {Model} from "../../model"
 import * as p from "core/properties"
 import {create_hit_test_result, HitTestResult} from "core/hittest"
 import {intersection, range} from "core/util/array"
+import {Filter} from "../filters/filter"
+import {DataSource} from "./data_source"
 import {ColumnarDataSource} from "./columnar_data_source"
 
+export namespace CDSView {
+  export interface Attrs extends Model.Attrs {
+    filters: Filter[]
+    source: DataSource
+    indices: number[]
+    indices_map: {[key: string]: number[]}
+  }
+
+  export interface Opts extends Model.Opts {}
+}
+
+export interface CDSView extends CDSView.Attrs {}
 
 export class CDSView extends Model {
+
+  constructor(attrs?: Partial<CDSView.Attrs>, opts?: CDSView.Opts) {
+    super(attrs, opts)
+  }
+
   static initClass() {
     this.prototype.type = 'CDSView'
 
     this.define({
-     filters: [ p.Array, [] ],
-     source:  [ p.Instance  ],
+      filters: [ p.Array, [] ],
+      source:  [ p.Instance  ],
     })
 
     this.internal({
@@ -21,8 +40,8 @@ export class CDSView extends Model {
     })
   }
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
     this.compute_indices()
   }
 

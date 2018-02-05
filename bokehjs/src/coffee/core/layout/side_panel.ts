@@ -177,17 +177,29 @@ export function update_panel_constraints(view: SizeableView): void {
   _view_constraints.set(view, constraint)
 }
 
+export namespace SidePanel {
+  export interface Attrs extends LayoutCanvas.Attrs {
+    side: Side
+  }
+
+  export interface Opts extends LayoutCanvas.Opts {}
+}
+
+export interface SidePanel extends SidePanel.Attrs {}
+
 export class SidePanel extends LayoutCanvas {
+
+  constructor(attrs?: Partial<SidePanel.Attrs>, opts?: SidePanel.Opts) {
+    super(attrs, opts)
+  }
 
   static initClass() {
     this.prototype.type = "SidePanel"
 
     this.internal({
-      side: [ p.String ]
+      side: [ p.String ],
     })
   }
-
-  side: Side
 
   protected _dim: 0 | 1
   protected _normals: [number, number]
@@ -197,8 +209,8 @@ export class SidePanel extends LayoutCanvas {
     return `${this.type}(${this.id}, ${this.side})`
   }
 
-  initialize(options: any): void {
-    super.initialize(options)
+  initialize(): void {
+    super.initialize()
     switch(this.side) {
       case "above":
         this._dim = 0

@@ -5,6 +5,9 @@ Bokeh Version ``0.12.14`` is an incremental update that adds a few
 important features and fixes several bugs. Some of the highlights
 include:
 
+* Addition of several tools to draw and edit point, rect, multi-line
+  and patches glyphs (:bokeh-issue:`6370`) by modifying the underlying
+  ColumnDataSource.
 
 Many other small bugfixes and docs additions. For full details see the
 :bokeh-tree:`CHANGELOG`.
@@ -14,6 +17,21 @@ Migration Guide
 
 NOTE: the 0.12.x series is the last planned release series before a version
 1.0 release. For more information see the `project roadmap`_.
+
+Deprecations Removed
+~~~~~~~~~~~~~~~~~~~~
+
+The following deprecated features have been removed in this release:
+
+* `DynamicImageRenderer` (consider GeoViews_ instead)
+* BokehJS support for `*.tsx` templates (not typically user-facing)
+* `autoload_server` (use `server_document` or `server_session` instead)
+
+New Runtime Dependency
+~~~~~~~~~~~~~~~~~~~~~~
+
+The package ``packaging``, available via both conda and pip, was added as a
+new runtime dependency.
 
 Mapping of Unknown Catgorical Factors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -52,17 +70,6 @@ ranges.
 The old behavior may be restored by setting enabling the `snap_to_zoom`
 property.
 
-Slider CSS Prefixing
-~~~~~~~~~~~~~~~~~~~~
-
-Bokeh uses `noUiSlider`_ to implement its slider widgets. Previously the
-CSS selectors for the noUiSlider components were prefixed with `bk-`.
-For example, `bk-noUi-tooltip`. Due to changes in revent versions of the
-noUiSlider package, this prefixing has been removed. Now to apply styling
-to sliders, use the standard (unprefixed) noUiSlider CSS selectors.
-
-This change affects only users applying custom styles to slider CSS.
-
 Defining views' CSS classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -80,13 +87,13 @@ sub-views. The new approach is to override `css_classes()` method, e.g.:
 
 This change affects only creators of custom extensions.
 
-`HasProps.initialize(options)`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``HasProps.initialize()``
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Previously `HasProps.initialize()` took `attrs` as the first argument. This
-was nearly never used and so it was removed. The preferred way to configure
-values of attributes is to use bokehjs' properties system. This change
-affects only creators of custom extensions.
+Previously ``HasProps.initialize()`` took `attrs` and `options` as its arguments.
+This was nearly never used and so it was removed. The preferred way to configure
+values of attributes is to use bokehjs' properties system. This change affects
+only creators of custom extensions.
 
-.. _noUiSlider: https://refreshless.com/nouislider/
+.. _GeoViews: http://geo.holoviews.org
 .. _project roadmap: https://bokehplots.com/pages/roadmap.html

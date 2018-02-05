@@ -1,20 +1,36 @@
 /* XXX: partial */
-import {BasicTickFormatter} from "./basic_tick_formatter";
 import {TickFormatter} from "./tick_formatter";
+import {BasicTickFormatter} from "./basic_tick_formatter";
+import {LogTicker} from "../tickers/log_ticker"
 import {logger} from "core/logging";
 import * as p from "core/properties"
 
+export namespace LogTickFormatter {
+  export interface Attrs extends TickFormatter.Attrs {
+    ticker: LogTicker | null
+  }
+
+  export interface Opts extends TickFormatter.Opts {}
+}
+
+export interface LogTickFormatter extends LogTickFormatter.Attrs {}
+
 export class LogTickFormatter extends TickFormatter {
+
+  constructor(attrs?: Partial<LogTickFormatter.Attrs>, opts?: LogTickFormatter.Opts) {
+    super(attrs, opts)
+  }
+
   static initClass() {
     this.prototype.type = 'LogTickFormatter';
 
     this.define({
-      ticker: [ p.Instance, null ]
+      ticker: [ p.Instance, null ],
     });
   }
 
-  initialize(options: any): void {
-    super.initialize(options);
+  initialize(): void {
+    super.initialize();
     this.basic_formatter = new BasicTickFormatter();
     if ((this.ticker == null)) {
       logger.warn("LogTickFormatter not configured with a ticker, using default base of 10 (labels will be incorrect if ticker base is not 10)");

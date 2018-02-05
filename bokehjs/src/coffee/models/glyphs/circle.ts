@@ -1,25 +1,29 @@
 /* XXX: partial */
 import {XYGlyph, XYGlyphView} from "./xy_glyph";
+import {DistanceSpec, AngleSpec} from "core/vectorization"
+import {LineMixinVector, FillMixinVector} from "core/property_mixins"
+import {Dimension} from "core/enums"
 import * as hittest from "core/hittest";
 import * as p from "core/properties"
-import {range} from "core/util/array"
+import {range, map} from "core/util/array"
+import {Context2d} from "core/util/canvas"
 
 export class CircleView extends XYGlyphView {
+  model: Circle
 
-  _map_data() {
+  _map_data(): void {
     // NOTE: Order is important here: size is always present (at least
     // a default), but radius is only present if a user specifies it
     if (this._radius != null) {
       if (this.model.properties.radius.spec.units === "data") {
         const rd = this.model.properties.radius_dimension.spec.value;
-        return this.sradius = this.sdist(this.renderer[`${rd}scale`], this[`_${rd}`], this._radius);
+        this.sradius = this.sdist(this.renderer[`${rd}scale`], this[`_${rd}`], this._radius);
       } else {
         this.sradius = this._radius;
-        return this.max_size = 2 * this.max_radius;
+        this.max_size = 2 * this.max_radius;
       }
-    } else {
-      return this.sradius = (this._size.map((s) => s/2));
-    }
+    } else
+      this.sradius = map(this._size, (s: number) => s/2)
   }
 
   _mask_data(_all_indices) {
@@ -54,7 +58,7 @@ export class CircleView extends XYGlyphView {
     return this.index.indices(bbox);
   }
 
-  _render(ctx, indices, {sx, sy, sradius}) {
+  _render(ctx: Context2d, indices, {sx, sy, sradius}) {
     for (const i of indices) {
       if (isNaN(sx[i]+sy[i]+sradius[i])) {
         continue;
@@ -204,7 +208,7 @@ export class CircleView extends XYGlyphView {
 
   // circle does not inherit from marker (since it also accepts radius) so we
   // must supply a draw_legend for it  here
-  draw_legend_for_index(ctx, x0, x1, y0, y1, index) {
+  draw_legend_for_index(ctx: Context2d, x0, x1, y0, y1, index) {
     // using objects like this seems a little wonky, since the keys are coerced to
     // stings, but it works
     const indices = [index];
@@ -220,23 +224,42 @@ export class CircleView extends XYGlyphView {
   }
 }
 
-export class Circle extends XYGlyph {
-  static initClass() { // XXX: Marker
-    this.prototype.default_view = CircleView;
+export namespace Circle {
+  export interface Mixins extends LineMixinVector, FillMixinVector {}
 
+  export interface Attrs extends XYGlyph.Attrs, Mixins {
+    angle: AngleSpec
+    size: DistanceSpec
+    radius: DistanceSpec | null
+    radius_dimension: Dimension
+  }
+
+  export interface Opts extends XYGlyph.Opts {}
+}
+
+export interface Circle extends Circle.Attrs {}
+
+export class Circle extends XYGlyph {
+
+  constructor(attrs?: Partial<Circle.Attrs>, opts?: Circle.Opts) {
+    super(attrs, opts)
+  }
+
+  static initClass() { // XXX: Marker
     this.prototype.type = 'Circle';
+    this.prototype.default_view = CircleView;
 
     this.mixins(['line', 'fill']);
     this.define({
-        angle:            [ p.AngleSpec,    0                             ],
-        size:             [ p.DistanceSpec, { units: "screen", value: 4 } ],
-        radius:           [ p.DistanceSpec, null                          ],
-        radius_dimension: [ p.String,       'x'                           ]
-      });
+      angle:            [ p.AngleSpec,    0                             ],
+      size:             [ p.DistanceSpec, { units: "screen", value: 4 } ],
+      radius:           [ p.DistanceSpec, null                          ],
+      radius_dimension: [ p.String,       'x'                           ],
+    });
   }
 
-  initialize(options: any): void {
-    super.initialize(options);
+  initialize(): void {
+    super.initialize();
     this.properties.radius.optional = true;
   }
 }
