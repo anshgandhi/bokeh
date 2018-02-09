@@ -3,14 +3,17 @@ import * as hittest from "core/hittest";
 import * as p from "core/properties";
 import * as bbox from "core/util/bbox";
 import * as proj from "core/util/projections";
+import {Geometry, RectGeometry} from "core/geometry";
 import {Context2d} from "core/util/canvas"
 import {View} from "core/view";
 import {Model} from "../../model";
 import {Visuals} from "core/visuals";
+import {Anchor} from "core/enums"
 import {logger} from "core/logging";
 import {extend} from "core/util/object";
 import {isArray} from "core/util/types";
-import {LineView} from "./line"
+import {LineView} from "./line";
+import {Selection} from "../selections/selection";
 
 export abstract class GlyphView extends View {
   model: Glyph
@@ -121,8 +124,7 @@ export abstract class GlyphView extends View {
     };
   }
 
-  get_anchor_point(anchor, i, ...rest) {
-    const [sx, sy] = rest[0];
+  get_anchor_point(anchor: Anchor, i: number, [sx, sy]: [number, number]): {x: number, y: number} | null {
     switch (anchor) {
       case "center": return {x: this.scx(i, sx, sy), y: this.scy(i, sx, sy)};
       default:       return null;
@@ -189,11 +191,9 @@ export abstract class GlyphView extends View {
     }
   }
 
-  draw_legend_for_index(_ctx, _x0, _x1, _y0, _y1, _index) {
-    return null;
-  }
+  draw_legend_for_index(_ctx: Context2d, _x0: number, _x1: number, _y0: number, _y1: number, _index: number): void {}
 
-  _generic_line_legend(ctx: Context2d, x0, x1, y0, y1, index) {
+  protected _generic_line_legend(ctx: Context2d, x0: number, x1: number, y0: number, y1: number, index: number): void {
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(x0, (y0 + y1) /2);
@@ -202,10 +202,10 @@ export abstract class GlyphView extends View {
       this.visuals.line.set_vectorize(ctx, index);
       ctx.stroke();
     }
-    return ctx.restore();
+    ctx.restore();
   }
 
-  _generic_area_legend(ctx: Context2d, x0, x1, y0, y1, index) {
+  protected _generic_area_legend(ctx: Context2d, x0: number, x1: number, y0: number, y1: number, index: number): void {
     const w = Math.abs(x1-x0);
     const dw = w*0.1;
     const h = Math.abs(y1-y0);
@@ -226,11 +226,11 @@ export abstract class GlyphView extends View {
       ctx.beginPath();
       ctx.rect(sx0, sy0, sx1-sx0, sy1-sy0);
       this.visuals.line.set_vectorize(ctx, index);
-      return ctx.stroke();
+      ctx.stroke();
     }
   }
 
-  hit_test(geometry) {
+  hit_test(geometry: Geometry): hittest.HitTestResult {
     let result = null;
 
     const func = `_hit_${geometry.type}`;
@@ -244,13 +244,13 @@ export abstract class GlyphView extends View {
     return result;
   }
 
-  _hit_rect_against_index(geometry) {
+  _hit_rect_against_index(geometry: RectGeometry): Selection {
     const {sx0, sx1, sy0, sy1} = geometry;
     const [x0, x1] = this.renderer.xscale.r_invert(sx0, sx1);
     const [y0, y1] = this.renderer.yscale.r_invert(sy0, sy1);
     const bb = hittest.validate_bbox_coords([x0, x1], [y0, y1]);
-    const result = hittest.create_hit_test_result();
-    result['1d'].indices = this.index.indices(bb);
+    const result = hittest.create_empty_hit_test_result();
+    result.indices = this.index.indices(bb);
     return result;
   }
 
